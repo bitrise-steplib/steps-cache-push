@@ -9,6 +9,23 @@ app:
 workflows:
   test:
     steps:
+    - script:
+        title: Go Test
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            export GOPATH="$(pwd)/go"
+            cd ./go/src/github.com/bitrise-steplib/steps-cache-upload
+            go test ./...
+            # errcheck: https://github.com/kisielk/errcheck
+            # Install: `go get -u github.com/kisielk/errcheck`
+            #  and make sure your main $GOPATH/bin is in $PATH
+            errcheck -asserts=true -blank=true -verbose
+    - script:
+        title: Step audit
+        inputs:
+        - content: stepman audit --step-yml=./step.yml
     - change-workdir:
         title: Switch working dir to test / _tmp dir
         description: |-
@@ -22,14 +39,27 @@ workflows:
         - is_create_path: true
     - path::./:
         title: Step Test
-        description: |-
-          The example input has a default value,
-          you can overwrite it if you want to, just like we did below,
-          but the step would use the default value specified in the `step.yml`
-          file if you would not specify another value.
+        run_if: true
+        is_skippable: false
         inputs:
-        - example_step_input: Example Step Input's value
+        - cache_paths: |
+            ../_samples/dir1/
+            ./DoesNotExist/
+            ./DoesNotExist
+            ../_tmp/ignored-samples/Pods/
+            ../_samples/single_file/simple_text_file.txt
 
+  go-dep-update:
+    steps:
+    - script:
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            export GOPATH="$(pwd)/go"
+            cd ./go/src/github.com/bitrise-steplib/steps-cache-upload
+            go get ./...
+            godep save
 
   # ----------------------------------------------------------------
   # --- workflows to Share this step into a Step Library
