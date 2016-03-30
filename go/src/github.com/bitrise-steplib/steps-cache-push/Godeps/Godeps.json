@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/bitrise-steplib/steps-cache-upload",
+	"ImportPath": "github.com/bitrise-steplib/steps-cache-push",
 	"GoVersion": "go1.6",
 	"Packages": [
 		"./..."

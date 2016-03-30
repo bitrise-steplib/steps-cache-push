@@ -135,6 +135,16 @@ func cleanupCachePaths(requestedCachePaths []string) []string {
 	return filteredPaths
 }
 
+func createCacheArchiveFromPaths(pathsToCache []string) error {
+	cacheArchiveTmpPth, err := pathutil.NormalizedOSTempDirPath("")
+	if err != nil {
+		return fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
+	}
+	log.Printf("=> cacheArchiveTmpPth: %s", cacheArchiveTmpPth)
+
+	return nil
+}
+
 func main() {
 	fmt.Println("Caching...")
 
@@ -174,4 +184,7 @@ func main() {
 	//  * rsync
 	//  * compress (tar.gz)
 	//  * upload
+	if err := createCacheArchiveFromPaths(stepParams.Paths); err != nil {
+		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
+	}
 }

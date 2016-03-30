@@ -16,7 +16,7 @@ workflows:
             #!/bin/bash
             set -ex
             export GOPATH="$(pwd)/go"
-            cd ./go/src/github.com/bitrise-steplib/steps-cache-upload
+            cd ./go/src/github.com/bitrise-steplib/steps-cache-push
             go test ./...
             # errcheck: https://github.com/kisielk/errcheck
             # Install: `go get -u github.com/kisielk/errcheck`
@@ -57,7 +57,7 @@ workflows:
             #!/bin/bash
             set -ex
             export GOPATH="$(pwd)/go"
-            cd ./go/src/github.com/bitrise-steplib/steps-cache-upload
+            cd ./go/src/github.com/bitrise-steplib/steps-cache-push
             go get ./...
             godep save
 
