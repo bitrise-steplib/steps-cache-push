@@ -59,7 +59,7 @@ workflows:
             export GOPATH="$(pwd)/go"
             cd ./go/src/github.com/bitrise-steplib/steps-cache-push
             go get ./...
-            godep save
+            godep save ./...
 
   # ----------------------------------------------------------------
   # --- workflows to Share this step into a Step Library

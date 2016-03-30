@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bitrise-io/go-utils/cmdex"
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
@@ -135,12 +136,59 @@ func cleanupCachePaths(requestedCachePaths []string) []string {
 	return filteredPaths
 }
 
-func createCacheArchiveFromPaths(pathsToCache []string) error {
-	cacheArchiveTmpPth, err := pathutil.NormalizedOSTempDirPath("")
+func createCacheArchiveFromPaths(pathsToCache []string) (string, error) {
+	cacheArchiveTmpBaseDirPth, err := pathutil.NormalizedOSTempDirPath("")
 	if err != nil {
-		return fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
+		return "", fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
 	}
-	log.Printf("=> cacheArchiveTmpPth: %s", cacheArchiveTmpPth)
+	fmt.Println()
+	log.Printf("=> cacheArchiveTmpBaseDirPth: %s", cacheArchiveTmpBaseDirPth)
+	fmt.Println()
+
+	cacheContentDirName := "content"
+	cacheContentDirPath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheContentDirName)
+	if err := pathutil.EnsureDirExist(cacheContentDirPath); err != nil {
+		return "", fmt.Errorf("Failed to create Cache Content directory: %s", err)
+	}
+
+	for idx, aPath := range pathsToCache {
+		aPath = path.Clean(aPath)
+		fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
+		if err != nil {
+			return "", fmt.Errorf("Failed to check path (%s): %s", aPath, err)
+		}
+		if !isExist {
+			return "", fmt.Errorf("Path does not exist: %s", aPath)
+		}
+
+		archiveCopyRsyncParams := []string{}
+		if fileInfo.IsDir() {
+			archiveCopyRsyncParams = []string{"-avhP", aPath + "/", filepath.Join(cacheContentDirPath, fmt.Sprintf("c-%d", idx)) + "/"}
+		} else {
+			archiveCopyRsyncParams = []string{"-avhP", aPath, filepath.Join(cacheContentDirPath, fmt.Sprintf("c-%d", idx))}
+		}
+
+		log.Printf(" $ rsync %s", archiveCopyRsyncParams)
+		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
+			log.Printf(" [!] Failed to sync archive target (%s), full output (stdout & stderr) was: %s", aPath, fullOut)
+			return "", fmt.Errorf("Failed to sync archive target (%s): %s", aPath, err)
+		}
+	}
+
+	cacheArchiveFileName := "cache.tar.gz"
+	tarCmdParams := []string{"-cvzf", cacheArchiveFileName, cacheContentDirName}
+	log.Printf(" $ tar %s", tarCmdParams)
+	if fullOut, err := cmdex.RunCommandInDirAndReturnCombinedStdoutAndStderr(cacheArchiveTmpBaseDirPth, "tar", tarCmdParams...); err != nil {
+		log.Printf(" [!] Failed to create cache archive, full output (stdout & stderr) was: %s", fullOut)
+		return "", fmt.Errorf("Failed to create cache archive, error was: %s", err)
+	}
+	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
+
+	return cacheArchiveFilePath, nil
+}
+
+func compressArchiveDir(sourceArchiveDirPth, targetCompressedFilePth string) error {
+	// tar -cvzf tarballname.tar.gz itemtocompress
 
 	return nil
 }
@@ -184,7 +232,9 @@ func main() {
 	//  * rsync
 	//  * compress (tar.gz)
 	//  * upload
-	if err := createCacheArchiveFromPaths(stepParams.Paths); err != nil {
+	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths)
+	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
 	}
+	log.Printf(" => archiveFilePath: %s", archiveFilePath)
 }

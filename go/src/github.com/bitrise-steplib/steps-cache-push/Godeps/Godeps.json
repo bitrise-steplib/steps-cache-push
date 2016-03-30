@@ -6,6 +6,10 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/bitrise-io/go-utils/cmdex",
+			"Rev": "7cbebd518b3908ff12ab3e2df364ffd43fb62aea"
+		},
+		{
 			"ImportPath": "github.com/bitrise-io/go-utils/pathutil",
 			"Rev": "7cbebd518b3908ff12ab3e2df364ffd43fb62aea"
 		},
