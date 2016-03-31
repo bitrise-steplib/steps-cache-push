@@ -34,3 +34,9 @@ inputs:
 
         A path item can be either a file or a directory.
       is_required: true
+  - workdir: $BITRISE_SOURCE_DIR
+    opts:
+      title: Working directory path
+      summary: Working directory path
+      description: |-
+        Working directory path - should be an absolute path.

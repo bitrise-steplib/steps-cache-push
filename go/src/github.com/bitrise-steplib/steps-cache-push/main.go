@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -19,6 +21,18 @@ import (
 // StepParams ...
 type StepParams struct {
 	Paths []string
+}
+
+// CacheContentModel ...
+type CacheContentModel struct {
+	DestinationPath       string `json:"destination_path"`
+	RelativePathInArchive string `json:"relative_path_in_archive"`
+}
+
+// CacheInfosModel ...
+type CacheInfosModel struct {
+	Fingerprint string              `json:"fingerprint"`
+	Contents    []CacheContentModel `json:"cache_contents"`
 }
 
 // CreateStepParamsFromEnvs ...
@@ -136,7 +150,7 @@ func cleanupCachePaths(requestedCachePaths []string) []string {
 	return filteredPaths
 }
 
-func createCacheArchiveFromPaths(pathsToCache []string) (string, error) {
+func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprint string) (string, error) {
 	cacheArchiveTmpBaseDirPth, err := pathutil.NormalizedOSTempDirPath("")
 	if err != nil {
 		return "", fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
@@ -151,6 +165,10 @@ func createCacheArchiveFromPaths(pathsToCache []string) (string, error) {
 		return "", fmt.Errorf("Failed to create Cache Content directory: %s", err)
 	}
 
+	cacheInfo := CacheInfosModel{
+		Fingerprint: archiveContentFingerprint,
+		Contents:    []CacheContentModel{},
+	}
 	for idx, aPath := range pathsToCache {
 		aPath = path.Clean(aPath)
 		fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
@@ -162,11 +180,18 @@ func createCacheArchiveFromPaths(pathsToCache []string) (string, error) {
 		}
 
 		archiveCopyRsyncParams := []string{}
+		itemRelPathInArchive := fmt.Sprintf("c-%d", idx)
+
 		if fileInfo.IsDir() {
-			archiveCopyRsyncParams = []string{"-avhP", aPath + "/", filepath.Join(cacheContentDirPath, fmt.Sprintf("c-%d", idx)) + "/"}
+			archiveCopyRsyncParams = []string{"-avhP", aPath + "/", filepath.Join(cacheContentDirPath, itemRelPathInArchive+"/")}
 		} else {
-			archiveCopyRsyncParams = []string{"-avhP", aPath, filepath.Join(cacheContentDirPath, fmt.Sprintf("c-%d", idx))}
+			archiveCopyRsyncParams = []string{"-avhP", aPath, filepath.Join(cacheContentDirPath, itemRelPathInArchive)}
 		}
+
+		cacheInfo.Contents = append(cacheInfo.Contents, CacheContentModel{
+			DestinationPath:       aPath,
+			RelativePathInArchive: itemRelPathInArchive,
+		})
 
 		log.Printf(" $ rsync %s", archiveCopyRsyncParams)
 		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
@@ -175,22 +200,26 @@ func createCacheArchiveFromPaths(pathsToCache []string) (string, error) {
 		}
 	}
 
+	// store CacheInfo into the cache content dir
+	jsonBytes, err := json.Marshal(cacheInfo)
+	if err != nil {
+		return "", fmt.Errorf("Failed to generate Cache Info JSON: %s", err)
+	}
+	cacheInfoFilePath := filepath.Join(cacheContentDirPath, "cache-info.json")
+	if err := ioutil.WriteFile(cacheInfoFilePath, jsonBytes, 0666); err != nil {
+		return "", fmt.Errorf("Failed to write Cache Info JSON to file (%s): %s", cacheInfoFilePath, err)
+	}
+
 	cacheArchiveFileName := "cache.tar.gz"
-	tarCmdParams := []string{"-cvzf", cacheArchiveFileName, cacheContentDirName}
+	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
+	tarCmdParams := []string{"-cvzf", cacheArchiveFilePath, "."}
 	log.Printf(" $ tar %s", tarCmdParams)
-	if fullOut, err := cmdex.RunCommandInDirAndReturnCombinedStdoutAndStderr(cacheArchiveTmpBaseDirPth, "tar", tarCmdParams...); err != nil {
+	if fullOut, err := cmdex.RunCommandInDirAndReturnCombinedStdoutAndStderr(cacheContentDirPath, "tar", tarCmdParams...); err != nil {
 		log.Printf(" [!] Failed to create cache archive, full output (stdout & stderr) was: %s", fullOut)
 		return "", fmt.Errorf("Failed to create cache archive, error was: %s", err)
 	}
-	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
 
 	return cacheArchiveFilePath, nil
-}
-
-func compressArchiveDir(sourceArchiveDirPth, targetCompressedFilePth string) error {
-	// tar -cvzf tarballname.tar.gz itemtocompress
-
-	return nil
 }
 
 func main() {
@@ -217,14 +246,8 @@ func main() {
 	if len(pthsFingerprint) < 1 {
 		log.Fatal(" [!] Failed to calculate fingerprint: empty fingerprint generated")
 	}
-	fmt.Printf("pthsFingerprint (base 16): %x\n", pthsFingerprint)
-	// for _, aPath := range stepParams.Paths {
-	// 	pthFingerprint, err := FingerprintOfPaths(aPath)
-	// 	if err != nil {
-	// 		log.Fatalf(" [!] Failed to calculate fingerprint of path (%s): %s", aPath, err)
-	// 	}
-	// 	fmt.Printf("pthFingerprint: %#v\n", pthFingerprint)
-	// }
+	fingerprintBase16Str := fmt.Sprintf("%x", pthsFingerprint)
+	fmt.Printf("fingerprintBase16Str (base 16): %s\n", fingerprintBase16Str)
 
 	// compare fingerprints
 
@@ -232,9 +255,10 @@ func main() {
 	//  * rsync
 	//  * compress (tar.gz)
 	//  * upload
-	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths)
+	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths, fingerprintBase16Str)
 	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
 	}
 	log.Printf(" => archiveFilePath: %s", archiveFilePath)
+
 }
