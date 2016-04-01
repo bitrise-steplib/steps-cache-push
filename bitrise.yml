@@ -4,7 +4,7 @@ default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 app:
   envs:
   # define these in your .bitrise.secrets.yml
-  - A_SECRET_PARAM: $A_SECRET_PARAM
+  - BITRISE_CACHE_UPLOAD_URL: $BITRISE_CACHE_UPLOAD_URL
 
 workflows:
   test:
@@ -42,6 +42,7 @@ workflows:
         run_if: true
         is_skippable: false
         inputs:
+        - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
         - cache_paths: |
             ../_samples/dir1/
             ./DoesNotExist/

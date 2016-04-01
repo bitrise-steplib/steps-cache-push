@@ -40,3 +40,10 @@ inputs:
       summary: Working directory path
       description: |-
         Working directory path - should be an absolute path.
+  - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
+    opts:
+      title: "TMP: Cache Upload URL"
+      summary: "Cache Upload URL"
+      description: |-
+        Cache Upload URL
+      is_required: true

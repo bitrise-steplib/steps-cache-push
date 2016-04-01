@@ -9,18 +9,21 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bitrise-io/go-utils/cmdex"
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
-// StepParams ...
-type StepParams struct {
-	Paths []string
+// StepParamsModel ...
+type StepParamsModel struct {
+	Paths          []string
+	CacheUploadURL string
 }
 
 // CacheContentModel ...
@@ -36,12 +39,19 @@ type CacheInfosModel struct {
 }
 
 // CreateStepParamsFromEnvs ...
-func CreateStepParamsFromEnvs() (StepParams, error) {
-	stepParams := StepParams{}
+func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
+	cacheUploadURL := os.Getenv("cache_upload_url")
 
 	if cacheDirs == "" {
-		return StepParams{}, errors.New("No cache_paths input specified")
+		return StepParamsModel{}, errors.New("No cache_paths input specified")
+	}
+	if cacheUploadURL == "" {
+		return StepParamsModel{}, errors.New("No cacheUploadURL input specified")
+	}
+
+	stepParams := StepParamsModel{
+		CacheUploadURL: cacheUploadURL,
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
@@ -52,7 +62,7 @@ func CreateStepParamsFromEnvs() (StepParams, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return StepParams{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
+		return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
 	}
 
 	return stepParams, nil
@@ -222,6 +232,72 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 	return cacheArchiveFilePath, nil
 }
 
+func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
+	archFile, err := os.Open(archiveFilePath)
+	if err != nil {
+		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
+	}
+	isFileCloseRequired := true
+	defer func() {
+		if !isFileCloseRequired {
+			return
+		}
+		if err := archFile.Close(); err != nil {
+			log.Printf(" (!) Failed to close archive file (%s): %s", archiveFilePath, err)
+		}
+	}()
+
+	fileInfo, err := archFile.Stat()
+	if err != nil {
+		return fmt.Errorf("Failed to get File Stats of the Archive file (%s): %s", archiveFilePath, err)
+	}
+	fileSize := fileInfo.Size()
+
+	req, err := http.NewRequest("PUT", stepParams.CacheUploadURL, archFile)
+	if err != nil {
+		return fmt.Errorf("Failed to create upload request: %s", err)
+	}
+
+	// req.Header.Set("Content-Type", "application/octet-stream")
+	// req.Header.Add("Content-Length", strconv.FormatInt(fileSize, 10))
+	req.ContentLength = fileSize
+	log.Printf("=> req: %#v", req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Failed to upload: %s", err)
+	}
+	isFileCloseRequired = false
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf(" [!] Failed to close response body: %s", err)
+		}
+	}()
+
+	responseBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("Failed to read response: %s", err)
+	}
+	log.Printf("=> Upload response: %s", responseBytes)
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Failed to upload file, response code was: %d", resp.StatusCode)
+	}
+	log.Printf("=> Upload response code: %d", resp.StatusCode)
+
+	return nil
+}
+
+func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
+	if err := _tryToUploadArchive(stepParams, archiveFilePath); err != nil {
+		fmt.Println()
+		log.Printf(" ===> (!) First upload attempt failed, retrying...")
+		fmt.Println()
+		time.Sleep(3000 * time.Millisecond)
+		return _tryToUploadArchive(stepParams, archiveFilePath)
+	}
+	return nil
+}
+
 func main() {
 	fmt.Println("Caching...")
 
@@ -261,4 +337,7 @@ func main() {
 	}
 	log.Printf(" => archiveFilePath: %s", archiveFilePath)
 
+	if err := uploadArchive(stepParams, archiveFilePath); err != nil {
+		log.Fatalf(" [!] Failed to upload Cache Archive: %s", err)
+	}
 }
