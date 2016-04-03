@@ -40,6 +40,16 @@ inputs:
       summary: Working directory path
       description: |-
         Working directory path - should be an absolute path.
+  - is_debug_mode: "false"
+    opts:
+      title: "Debug mode?"
+      summary: "If debug mode is enabled the step will print verbose logs"
+      description: |-
+        If debug mode is enabled the step will print verbose logs
+      is_required: true
+      value_options:
+      - "true"
+      - "false"
   - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
     opts:
       title: "TMP: Cache Upload URL"
@@ -47,3 +57,13 @@ inputs:
       description: |-
         Cache Upload URL
       is_required: true
+      is_dont_change_value: true
+  - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
+    opts:
+      title: "Cache Info file path, for compare"
+      summary: "Compare the fingerprints against this Cache Info"
+      description: |-
+        Compare the fingerprints against this Cache Info, to see if cache
+        update/upload is required or not.
+      is_required: true
+      is_dont_change_value: true

@@ -22,8 +22,9 @@ import (
 
 // StepParamsModel ...
 type StepParamsModel struct {
-	Paths          []string
-	CacheUploadURL string
+	Paths                []string
+	CacheUploadURL       string
+	CompareCacheInfoPath string
 }
 
 // CacheContentModel ...
@@ -38,6 +39,18 @@ type CacheInfosModel struct {
 	Contents    []CacheContentModel `json:"cache_contents"`
 }
 
+func readCacheInfoFromFile(filePth string) (CacheInfosModel, error) {
+	jsonBytes, err := ioutil.ReadFile(filePth)
+	if err != nil {
+		return CacheInfosModel{}, fmt.Errorf("Failed to read file: %s", err)
+	}
+	var cacheInfo CacheInfosModel
+	if err := json.Unmarshal(jsonBytes, &cacheInfo); err != nil {
+		return CacheInfosModel{}, fmt.Errorf("Failed to parse JSON: %s", err)
+	}
+	return cacheInfo, nil
+}
+
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
@@ -47,11 +60,12 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 		return StepParamsModel{}, errors.New("No cache_paths input specified")
 	}
 	if cacheUploadURL == "" {
-		return StepParamsModel{}, errors.New("No cacheUploadURL input specified")
+		return StepParamsModel{}, errors.New("No cache_upload_url input specified")
 	}
 
 	stepParams := StepParamsModel{
-		CacheUploadURL: cacheUploadURL,
+		CacheUploadURL:       cacheUploadURL,
+		CompareCacheInfoPath: os.Getenv("compare_cache_info_path"),
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
@@ -326,11 +340,22 @@ func main() {
 	fmt.Printf("fingerprintBase16Str (base 16): %s\n", fingerprintBase16Str)
 
 	// compare fingerprints
+	if stepParams.CompareCacheInfoPath != "" {
+		log.Printf("Comparing fingerprint with cache info from: %s", stepParams.CompareCacheInfoPath)
+		cacheInfo, err := readCacheInfoFromFile(stepParams.CompareCacheInfoPath)
+		if err != nil {
+			fmt.Printf(" [!] Failed to read Cache Info for compare: %s", err)
+		} else {
+			if cacheInfo.Fingerprint == fingerprintBase16Str {
+				fmt.Println(" => (i) Fingerprint matches the original one, no need to update Cache - DONE")
+				return
+			}
+			fmt.Printf(" (i) Fingerprint (%s) does not match the original one (%s), Cache update required", fingerprintBase16Str, cacheInfo.Fingerprint)
+		}
+	} else {
+		log.Println("No base Cache Info found for compare - new cache will be created")
+	}
 
-	// if changed:
-	//  * rsync
-	//  * compress (tar.gz)
-	//  * upload
 	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths, fingerprintBase16Str)
 	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
@@ -340,4 +365,6 @@ func main() {
 	if err := uploadArchive(stepParams, archiveFilePath); err != nil {
 		log.Fatalf(" [!] Failed to upload Cache Archive: %s", err)
 	}
+
+	log.Println(" => DONE")
 }

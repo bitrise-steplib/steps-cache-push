@@ -5,6 +5,7 @@ app:
   envs:
   # define these in your .bitrise.secrets.yml
   - BITRISE_CACHE_UPLOAD_URL: $BITRISE_CACHE_UPLOAD_URL
+  - BITRISE_CACHE_INFO_PATH: $BITRISE_CACHE_INFO_PATH
 
 workflows:
   test:
@@ -42,13 +43,15 @@ workflows:
         run_if: true
         is_skippable: false
         inputs:
-        - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
+        - is_debug_mode: "false"
         - cache_paths: |
             ../_samples/dir1/
             ./DoesNotExist/
             ./DoesNotExist
             ../_tmp/ignored-samples/Pods/
             ../_samples/single_file/simple_text_file.txt
+        - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
+        - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
 
   go-dep-update:
     steps:
