@@ -323,6 +323,15 @@ func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) err
 
 func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
 	log.Println("=> Uploading ...")
+	{
+		fi, err := os.Stat(archiveFilePath)
+		if err != nil {
+			log.Printf(" [!] Failed to get File Infos of Archive (%s): %s", archiveFilePath, err)
+		} else {
+			sizeInBytes := fi.Size()
+			log.Printf("   Archive file size: %d bytes / %f MB", sizeInBytes, (float64(sizeInBytes) / 1024.0 / 1024.0))
+		}
+	}
 	if err := _tryToUploadArchive(stepParams, archiveFilePath); err != nil {
 		fmt.Println()
 		log.Printf(" ===> (!) First upload attempt failed, retrying...")
