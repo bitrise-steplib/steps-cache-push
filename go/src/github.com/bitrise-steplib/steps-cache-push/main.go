@@ -322,6 +322,7 @@ func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) err
 }
 
 func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
+	log.Println("=> Uploading ...")
 	if err := _tryToUploadArchive(stepParams, archiveFilePath); err != nil {
 		fmt.Println()
 		log.Printf(" ===> (!) First upload attempt failed, retrying...")
