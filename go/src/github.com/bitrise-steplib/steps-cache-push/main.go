@@ -20,11 +20,16 @@ import (
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
+var (
+	gIsDebugMode = false
+)
+
 // StepParamsModel ...
 type StepParamsModel struct {
 	Paths                []string
 	CacheUploadURL       string
 	CompareCacheInfoPath string
+	IsDebugMode          bool
 }
 
 // CacheContentModel ...
@@ -66,6 +71,7 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	stepParams := StepParamsModel{
 		CacheUploadURL:       cacheUploadURL,
 		CompareCacheInfoPath: os.Getenv("compare_cache_info_path"),
+		IsDebugMode:          os.Getenv("is_debug_mode") == "true",
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
@@ -115,11 +121,15 @@ func fingerprintOfPaths(pths []string) ([]byte, error) {
 					return nil
 				}
 				if !aFileInfo.Mode().IsRegular() {
-					log.Printf(" (i) File (%s) is not a regular file (it's a symlink, a device, or something similar) - skipping", aPath)
+					if gIsDebugMode {
+						log.Printf(" (i) File (%s) is not a regular file (it's a symlink, a device, or something similar) - skipping", aPath)
+					}
 					return nil
 				}
 				fileFingerprintSource := fingerprintSourceStringOfFile(aPath, aFileInfo)
-				log.Printf(" * fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
+				if gIsDebugMode {
+					log.Printf(" * fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
+				}
 				if _, err := io.WriteString(fingerprintHash, fileFingerprintSource); err != nil {
 					return fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
 						fileFingerprintSource, err)
@@ -131,7 +141,9 @@ func fingerprintOfPaths(pths []string) ([]byte, error) {
 			}
 		} else {
 			fileFingerprintSource := fingerprintSourceStringOfFile(aPath, fileInfo)
-			log.Printf(" -> fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
+			if gIsDebugMode {
+				log.Printf(" -> fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
+			}
 			if _, err := io.WriteString(fingerprintHash, fileFingerprintSource); err != nil {
 				return []byte{}, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
 					fileFingerprintSource, err)
@@ -179,9 +191,11 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 	if err != nil {
 		return "", fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
 	}
-	fmt.Println()
-	log.Printf("=> cacheArchiveTmpBaseDirPth: %s", cacheArchiveTmpBaseDirPth)
-	fmt.Println()
+	if gIsDebugMode {
+		fmt.Println()
+		log.Printf("=> cacheArchiveTmpBaseDirPth: %s", cacheArchiveTmpBaseDirPth)
+		fmt.Println()
+	}
 
 	cacheContentDirName := "content"
 	cacheContentDirPath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheContentDirName)
@@ -217,7 +231,9 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 			RelativePathInArchive: itemRelPathInArchive,
 		})
 
-		log.Printf(" $ rsync %s", archiveCopyRsyncParams)
+		if gIsDebugMode {
+			log.Printf(" $ rsync %s", archiveCopyRsyncParams)
+		}
 		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
 			log.Printf(" [!] Failed to sync archive target (%s), full output (stdout & stderr) was: %s", aPath, fullOut)
 			return "", fmt.Errorf("Failed to sync archive target (%s): %s", aPath, err)
@@ -237,7 +253,9 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 	cacheArchiveFileName := "cache.tar.gz"
 	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
 	tarCmdParams := []string{"-cvzf", cacheArchiveFilePath, "."}
-	log.Printf(" $ tar %s", tarCmdParams)
+	if gIsDebugMode {
+		log.Printf(" $ tar %s", tarCmdParams)
+	}
 	if fullOut, err := cmdex.RunCommandInDirAndReturnCombinedStdoutAndStderr(cacheContentDirPath, "tar", tarCmdParams...); err != nil {
 		log.Printf(" [!] Failed to create cache archive, full output (stdout & stderr) was: %s", fullOut)
 		return "", fmt.Errorf("Failed to create cache archive, error was: %s", err)
@@ -275,7 +293,9 @@ func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) err
 	// req.Header.Set("Content-Type", "application/octet-stream")
 	// req.Header.Add("Content-Length", strconv.FormatInt(fileSize, 10))
 	req.ContentLength = fileSize
-	log.Printf("=> req: %#v", req)
+	if gIsDebugMode {
+		log.Printf("=> req: %#v", req)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Failed to upload: %s", err)
@@ -313,15 +333,19 @@ func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
 }
 
 func main() {
-	fmt.Println("Caching...")
-
 	stepParams, err := CreateStepParamsFromEnvs()
 	if err != nil {
 		log.Fatalf(" [!] Input error : %s", err)
 	}
-	fmt.Printf("stepParams: %#v\n", stepParams)
+	gIsDebugMode = stepParams.IsDebugMode
+
+	if gIsDebugMode {
+		log.Printf("=> stepParams: %#v", stepParams)
+	}
+
+	log.Printf("=> Oritinal list of paths to cache: %s", stepParams.Paths)
 	stepParams.Paths = cleanupCachePaths(stepParams.Paths)
-	log.Printf("Filtered cache paths: %#v", stepParams.Paths)
+	log.Printf("=> Filtered paths to cache: %s", stepParams.Paths)
 
 	if len(stepParams.Paths) < 1 {
 		log.Println("No paths specified to be cached, stopping.")
@@ -337,23 +361,25 @@ func main() {
 		log.Fatal(" [!] Failed to calculate fingerprint: empty fingerprint generated")
 	}
 	fingerprintBase16Str := fmt.Sprintf("%x", pthsFingerprint)
-	fmt.Printf("fingerprintBase16Str (base 16): %s\n", fingerprintBase16Str)
+	log.Printf("=> Calculated Fingerprint (base 16): %s", fingerprintBase16Str)
 
 	// compare fingerprints
 	if stepParams.CompareCacheInfoPath != "" {
-		log.Printf("Comparing fingerprint with cache info from: %s", stepParams.CompareCacheInfoPath)
+		if gIsDebugMode {
+			log.Printf("Comparing fingerprint with cache info from: %s", stepParams.CompareCacheInfoPath)
+		}
 		cacheInfo, err := readCacheInfoFromFile(stepParams.CompareCacheInfoPath)
 		if err != nil {
-			fmt.Printf(" [!] Failed to read Cache Info for compare: %s", err)
+			log.Printf(" [!] Failed to read Cache Info for compare: %s", err)
 		} else {
 			if cacheInfo.Fingerprint == fingerprintBase16Str {
-				fmt.Println(" => (i) Fingerprint matches the original one, no need to update Cache - DONE")
+				log.Println(" => (i) Fingerprint matches the original one, no need to update Cache - DONE")
 				return
 			}
-			fmt.Printf(" (i) Fingerprint (%s) does not match the original one (%s), Cache update required", fingerprintBase16Str, cacheInfo.Fingerprint)
+			log.Printf(" (i) Fingerprint (%s) does not match the original one (%s), Cache update required", fingerprintBase16Str, cacheInfo.Fingerprint)
 		}
 	} else {
-		log.Println("No base Cache Info found for compare - new cache will be created")
+		log.Println("No base Cache Info found for compare - New cache will be created")
 	}
 
 	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths, fingerprintBase16Str)
