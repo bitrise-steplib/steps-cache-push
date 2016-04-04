@@ -27,6 +27,7 @@ inputs:
       $BITRISE_CACHE_DIR
       ./Pods
       $HOME/.gradle/wrapper
+      ./.gradle
     opts:
       title: "Cache paths"
       summary: Cache these paths. Separate paths with a newline.
