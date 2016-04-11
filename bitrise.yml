@@ -4,7 +4,7 @@ default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 app:
   envs:
   # define these in your .bitrise.secrets.yml
-  - BITRISE_CACHE_UPLOAD_URL: $BITRISE_CACHE_UPLOAD_URL
+  - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL
   - BITRISE_CACHE_INFO_PATH: $BITRISE_CACHE_INFO_PATH
 
 workflows:
@@ -50,7 +50,7 @@ workflows:
             ./DoesNotExist
             ../_tmp/ignored-samples/Pods/
             ../_samples/single_file/simple_text_file.txt
-        - cache_upload_url: $BITRISE_CACHE_UPLOAD_URL
+        - cache_api_url: $BITRISE_CACHE_API_URL
         - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
 
   go-dep-update:

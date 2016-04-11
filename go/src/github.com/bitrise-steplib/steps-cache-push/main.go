@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +29,7 @@ var (
 // StepParamsModel ...
 type StepParamsModel struct {
 	Paths                []string
-	CacheUploadURL       string
+	CacheAPIURL          string
 	CompareCacheInfoPath string
 	IsDebugMode          bool
 }
@@ -59,17 +61,17 @@ func readCacheInfoFromFile(filePth string) (CacheInfosModel, error) {
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
-	cacheUploadURL := os.Getenv("cache_upload_url")
+	cacheAPIURL := os.Getenv("cache_api_url")
 
 	if cacheDirs == "" {
 		return StepParamsModel{}, errors.New("No cache_paths input specified")
 	}
-	if cacheUploadURL == "" {
-		return StepParamsModel{}, errors.New("No cache_upload_url input specified")
+	if cacheAPIURL == "" {
+		return StepParamsModel{}, errors.New("No cache_api_url input specified")
 	}
 
 	stepParams := StepParamsModel{
-		CacheUploadURL:       cacheUploadURL,
+		CacheAPIURL:          cacheAPIURL,
 		CompareCacheInfoPath: os.Getenv("compare_cache_info_path"),
 		IsDebugMode:          os.Getenv("is_debug_mode") == "true",
 	}
@@ -264,7 +266,7 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 	return cacheArchiveFilePath, nil
 }
 
-func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
+func _tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	archFile, err := os.Open(archiveFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
@@ -285,13 +287,13 @@ func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) err
 	}
 	fileSize := fileInfo.Size()
 
-	req, err := http.NewRequest("PUT", stepParams.CacheUploadURL, archFile)
+	req, err := http.NewRequest("PUT", uploadURL, archFile)
 	if err != nil {
 		return fmt.Errorf("Failed to create upload request: %s", err)
 	}
 
 	// req.Header.Set("Content-Type", "application/octet-stream")
-	// req.Header.Add("Content-Length", strconv.FormatInt(fileSize, 10))
+	req.Header.Add("Content-Length", strconv.FormatInt(fileSize, 10))
 	req.ContentLength = fileSize
 	if gIsDebugMode {
 		log.Printf("=> req: %#v", req)
@@ -321,23 +323,90 @@ func _tryToUploadArchive(stepParams StepParamsModel, archiveFilePath string) err
 	return nil
 }
 
+// CacheUploadAPIRequestDataModel ...
+type CacheUploadAPIRequestDataModel struct {
+	FileSizeInBytes int64 `json:"file_size_in_bytes"`
+}
+
+// GenerateUploadURLRespModel ...
+type GenerateUploadURLRespModel struct {
+	UploadURL string `json:"upload_url"`
+}
+
+func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
+	requestDataModel := CacheUploadAPIRequestDataModel{
+		FileSizeInBytes: fileSizeInBytes,
+	}
+
+	requestJSONBytes, err := json.Marshal(requestDataModel)
+	if err != nil {
+		return "", fmt.Errorf("Failed to JSON marshal CacheUploadAPIRequestDataModel: %s", err)
+	}
+
+	req, err := http.NewRequest("POST", cacheAPIURL, bytes.NewBuffer(requestJSONBytes))
+	if err != nil {
+		return "", fmt.Errorf("Failed to create request: %s", err)
+	}
+	// req.Header.Set("Content-Type", "application/json")
+	// req.Header.Set("Api-Token", apiToken)
+	// req.Header.Set("X-Bitrise-Event", "hook")
+
+	client := &http.Client{
+		Timeout: 20 * time.Second,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("Failed to send request: %s", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf(" [!] Exception: Failed to close response body, error: %s", err)
+		}
+	}()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("Request sent, but failed to read response body (http-code:%d): %s", resp.StatusCode, body)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode > 202 {
+		return "", fmt.Errorf("Upload URL was rejected (http-code:%d): %s", resp.StatusCode, body)
+	}
+
+	var respModel GenerateUploadURLRespModel
+	if err := json.Unmarshal(body, &respModel); err != nil {
+		return "", fmt.Errorf("Request sent, but failed to parse JSON response (http-code:%d): %s", resp.StatusCode, body)
+	}
+
+	if respModel.UploadURL == "" {
+		return "", fmt.Errorf("Request sent, but Upload URL is empty (http-code:%d): %s", resp.StatusCode, body)
+	}
+
+	return respModel.UploadURL, nil
+}
+
 func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
 	log.Println("=> Uploading ...")
-	{
-		fi, err := os.Stat(archiveFilePath)
-		if err != nil {
-			log.Printf(" [!] Failed to get File Infos of Archive (%s): %s", archiveFilePath, err)
-		} else {
-			sizeInBytes := fi.Size()
-			log.Printf("   Archive file size: %d bytes / %f MB", sizeInBytes, (float64(sizeInBytes) / 1024.0 / 1024.0))
-		}
+
+	fi, err := os.Stat(archiveFilePath)
+	if err != nil {
+		return fmt.Errorf("Failed to get File Infos of Archive (%s): %s", archiveFilePath, err)
 	}
-	if err := _tryToUploadArchive(stepParams, archiveFilePath); err != nil {
+	sizeInBytes := fi.Size()
+	log.Printf("   Archive file size: %d bytes / %f MB", sizeInBytes, (float64(sizeInBytes) / 1024.0 / 1024.0))
+
+	uploadURL, err := getCacheUploadURL(stepParams.CacheAPIURL, sizeInBytes)
+	if err != nil {
+		return fmt.Errorf("Failed to generate Upload URL: %s", err)
+	}
+	log.Printf("   uploadURL: %s", uploadURL)
+
+	if err := _tryToUploadArchive(uploadURL, archiveFilePath); err != nil {
 		fmt.Println()
 		log.Printf(" ===> (!) First upload attempt failed, retrying...")
 		fmt.Println()
 		time.Sleep(3000 * time.Millisecond)
-		return _tryToUploadArchive(stepParams, archiveFilePath)
+		return _tryToUploadArchive(uploadURL, archiveFilePath)
 	}
 	return nil
 }
