@@ -96,8 +96,32 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	return stepParams, nil
 }
 
-func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo) string {
-	return fmt.Sprintf("[%s]-[%d]-[%dB]-[0x%o]", pth, fileInfo.ModTime().Unix(), fileInfo.Size(), fileInfo.Mode())
+func sha1ChecksumOfFile(pth string) ([]byte, error) {
+	fileHasher := sha1.New()
+
+	f, err := os.Open(pth)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open file to create checksum, error: %s", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf(" (!) Failed to close file (%s) after creating its checksum, error: %s", pth, err)
+		}
+	}()
+
+	if _, err := io.Copy(fileHasher, f); err != nil {
+		return nil, fmt.Errorf("Failed create hash of file, error: %s", err)
+	}
+
+	return fileHasher.Sum(nil), nil
+}
+
+func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo) (string, error) {
+	fileShaChecksum, err := sha1ChecksumOfFile(pth)
+	if err != nil {
+		return "", fmt.Errorf("Failed to calculate checksum of file: %s", err)
+	}
+	return fmt.Sprintf("[%s]-[sha1:%x]-[%dB]-[0x%o]", pth, fileShaChecksum, fileInfo.Size(), fileInfo.Mode()), nil
 }
 
 // fingerprintOfPaths ...
@@ -141,7 +165,11 @@ func fingerprintOfPaths(pths []string) ([]byte, map[string]FingerprintMetaModel,
 					}
 					return nil
 				}
-				fileFingerprintSource := fingerprintSourceStringOfFile(aPath, aFileInfo)
+				fileFingerprintSource, err := fingerprintSourceStringOfFile(aPath, aFileInfo)
+				if err != nil {
+					return fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", aPath, err)
+				}
+
 				if gIsDebugMode {
 					log.Printf(" * fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
 				}
@@ -157,7 +185,11 @@ func fingerprintOfPaths(pths []string) ([]byte, map[string]FingerprintMetaModel,
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", aPath, err)
 			}
 		} else {
-			fileFingerprintSource := fingerprintSourceStringOfFile(aPath, fileInfo)
+			fileFingerprintSource, err := fingerprintSourceStringOfFile(aPath, fileInfo)
+			if err != nil {
+				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", aPath, err)
+			}
+
 			if gIsDebugMode {
 				log.Printf(" -> fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
 			}
