@@ -276,7 +276,7 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 	for aPath, currValue := range currentMeta {
 		prevValue, isFound := previousMeta[aPath]
 		if !isFound {
-			log.Printf("   [FILE ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
+			log.Printf("   [ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
 		} else {
 			delete(prevItmsLookup, aPath)
 			if currValue != prevValue {
@@ -290,7 +290,7 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 	}
 
 	for aPath := range prevItmsLookup {
-		log.Printf("   [FILE REMOVED] (File is no longer in the cache, but it was in the previous one): %s", aPath)
+		log.Printf("   [REMOVED] (File (meta info about the file) is no longer in the cache, but it was in the previous one): %s", aPath)
 	}
 
 	fmt.Println()
