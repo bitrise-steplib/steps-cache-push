@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -17,5 +19,74 @@ func Test_sandbox(t *testing.T) {
 	{
 		res := path.Clean("a//")
 		require.Equal(t, "a", res)
+	}
+}
+
+func Test_parseStepParamsPathItemModelFromString(t *testing.T) {
+	// simple
+	{
+		res, err := parseStepParamsPathItemModelFromString("./a/path")
+		require.NoError(t, err)
+		require.Equal(t, "./a/path", res.Path)
+		require.Equal(t, "", res.IndicatorFilePath)
+	}
+
+	// indicator
+	{
+		res, err := parseStepParamsPathItemModelFromString("./a/path -> an/indicator")
+		require.NoError(t, err)
+		require.Equal(t, "./a/path", res.Path)
+		require.Equal(t, "an/indicator", res.IndicatorFilePath)
+	}
+	{
+		res, err := parseStepParamsPathItemModelFromString("no/space->around/indicator")
+		require.NoError(t, err)
+		require.Equal(t, "no/space", res.Path)
+		require.Equal(t, "around/indicator", res.IndicatorFilePath)
+	}
+
+	// whitespaces
+	{
+		res, err := parseStepParamsPathItemModelFromString("     ./a/path   ")
+		require.NoError(t, err)
+		require.Equal(t, "./a/path", res.Path)
+		require.Equal(t, "", res.IndicatorFilePath)
+	}
+	{
+		res, err := parseStepParamsPathItemModelFromString("     ./a/path  ->   an/indicator ")
+		require.NoError(t, err)
+		require.Equal(t, "./a/path", res.Path)
+		require.Equal(t, "an/indicator", res.IndicatorFilePath)
+	}
+
+	// invalid
+	{
+		_, err := parseStepParamsPathItemModelFromString("multiple -> indicator -> in/item")
+		require.EqualError(t, err, "The indicator file separator (->) is specified more than once: multiple -> indicator -> in/item")
+	}
+	{
+		_, err := parseStepParamsPathItemModelFromString(" -> only/indicator")
+		require.EqualError(t, err, "No path specified in item:  -> only/indicator")
+	}
+}
+
+func Test_sha1ChecksumOfFile(t *testing.T) {
+	{
+		checksumBytes, err := sha1ChecksumOfFile("./_samples/simple_text_file.txt")
+		require.NoError(t, err)
+		require.Equal(t, "002de9a34df93e596a387b440fd83023452e6ec5", fmt.Sprintf("%x", checksumBytes))
+	}
+}
+
+func Test_fingerprintSourceStringOfFile(t *testing.T) {
+	{
+		sampleFilePth := "./_samples/simple_text_file.txt"
+		fileInfo, err := os.Stat(sampleFilePth)
+		require.NoError(t, err)
+
+		fingerprint, err := fingerprintSourceStringOfFile(sampleFilePth, fileInfo)
+		require.NoError(t, err)
+		expectedFingerprint := "[./_samples/simple_text_file.txt]-[sha1:002de9a34df93e596a387b440fd83023452e6ec5]-[26B]-[0x644]"
+		require.Equal(t, expectedFingerprint, fingerprint)
 	}
 }

@@ -22,13 +22,23 @@ import (
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
+const (
+	indicatorFileSeparator = "->"
+)
+
 var (
 	gIsDebugMode = false
 )
 
+// StepParamsPathItemModel ...
+type StepParamsPathItemModel struct {
+	Path              string
+	IndicatorFilePath string
+}
+
 // StepParamsModel ...
 type StepParamsModel struct {
-	Paths                []string
+	PathItems            []StepParamsPathItemModel
 	CacheAPIURL          string
 	CompareCacheInfoPath string
 	IsDebugMode          bool
@@ -64,6 +74,29 @@ func readCacheInfoFromFile(filePth string) (CacheInfosModel, error) {
 	return cacheInfo, nil
 }
 
+func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemModel, error) {
+	splits := strings.Split(itmStr, indicatorFileSeparator)
+	if len(splits) > 2 {
+		return StepParamsPathItemModel{}, fmt.Errorf("The indicator file separator (%s) is specified more than once: %s",
+			indicatorFileSeparator, itmStr)
+	}
+
+	aCachePth := strings.TrimSpace(splits[0])
+	if aCachePth == "" {
+		return StepParamsPathItemModel{}, fmt.Errorf("No path specified in item: %s",
+			itmStr)
+	}
+	anIndicatorFilePath := ""
+	if len(splits) == 2 {
+		anIndicatorFilePath = strings.TrimSpace(splits[1])
+	}
+
+	return StepParamsPathItemModel{
+		Path:              aCachePth,
+		IndicatorFilePath: anIndicatorFilePath,
+	}, nil
+}
+
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
@@ -84,10 +117,18 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 
 	scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
 	for scanner.Scan() {
-		aCachePth := scanner.Text()
-		if aCachePth != "" {
-			stepParams.Paths = append(stepParams.Paths, aCachePth)
+		aCachePathItemDef := scanner.Text()
+		aCachePathItemDef = strings.TrimSpace(aCachePathItemDef)
+		if aCachePathItemDef == "" {
+			continue
 		}
+
+		pthItm, err := parseStepParamsPathItemModelFromString(aCachePathItemDef)
+		if err != nil {
+			return StepParamsModel{}, fmt.Errorf("Invalid item: %s", err)
+		}
+
+		stepParams.PathItems = append(stepParams.PathItems, pthItm)
 	}
 	if err := scanner.Err(); err != nil {
 		return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
@@ -125,21 +166,31 @@ func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo) (string, er
 }
 
 // fingerprintOfPaths ...
-func fingerprintOfPaths(pths []string) ([]byte, map[string]FingerprintMetaModel, error) {
+func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]FingerprintMetaModel, error) {
 	fingerprintMeta := map[string]FingerprintMetaModel{}
 	fingerprintHash := sha1.New()
-	for _, aPath := range pths {
-		if aPath == "" {
+	for _, aPathItem := range pathItms {
+		theFingerprintSourcePath := aPathItem.Path
+		if aPathItem.IndicatorFilePath != "" {
+			theFingerprintSourcePath = aPathItem.IndicatorFilePath
+
+			if gIsDebugMode {
+				log.Printf(" ==> Using Indicator File as fingerprint source: %s", theFingerprintSourcePath)
+			}
+		}
+
+		if aPathItem.Path == "" {
 			continue
 		}
-		aPath = path.Clean(aPath)
-		if aPath == "/" {
+
+		theFingerprintSourcePath = path.Clean(theFingerprintSourcePath)
+		if theFingerprintSourcePath == "/" {
 			return []byte{}, fingerprintMeta, errors.New("Failed to check the specified path: caching the whole root (/) is forbidden (path was '/')")
 		}
 
-		absPth, err := pathutil.AbsPath(aPath)
+		absPth, err := pathutil.AbsPath(theFingerprintSourcePath)
 		if err != nil {
-			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to get Absolute path of item (%s): %s", aPath, err)
+			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to get Absolute path of item (%s): %s", theFingerprintSourcePath, err)
 		}
 
 		fileInfo, isExist, err := pathutil.PathCheckAndInfos(absPth)
@@ -151,7 +202,7 @@ func fingerprintOfPaths(pths []string) ([]byte, map[string]FingerprintMetaModel,
 		}
 
 		if fileInfo.IsDir() {
-			err := filepath.Walk(aPath, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
+			err := filepath.Walk(theFingerprintSourcePath, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
 				if walkErr != nil {
 					log.Printf(" (!) Error checking file (%s): %s", aPath, walkErr)
 				}
@@ -182,18 +233,18 @@ func fingerprintOfPaths(pths []string) ([]byte, map[string]FingerprintMetaModel,
 				return nil
 			})
 			if err != nil {
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", aPath, err)
+				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", theFingerprintSourcePath, err)
 			}
 		} else {
-			fileFingerprintSource, err := fingerprintSourceStringOfFile(aPath, fileInfo)
+			fileFingerprintSource, err := fingerprintSourceStringOfFile(theFingerprintSourcePath, fileInfo)
 			if err != nil {
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", aPath, err)
+				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", theFingerprintSourcePath, err)
 			}
 
 			if gIsDebugMode {
-				log.Printf(" -> fileFingerprintSource (%s): %#v", aPath, fileFingerprintSource)
+				log.Printf(" -> fileFingerprintSource (%s): %#v", theFingerprintSourcePath, fileFingerprintSource)
 			}
-			fingerprintMeta[aPath] = FingerprintMetaModel{FingerprintSource: fileFingerprintSource}
+			fingerprintMeta[theFingerprintSourcePath] = FingerprintMetaModel{FingerprintSource: fileFingerprintSource}
 
 			if _, err := io.WriteString(fingerprintHash, fileFingerprintSource); err != nil {
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
@@ -245,39 +296,68 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 	fmt.Println()
 }
 
-func cleanupCachePaths(requestedCachePaths []string) []string {
-	filteredPaths := []string{}
-	for _, aOrigPth := range requestedCachePaths {
-		if aOrigPth == "" {
+func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []StepParamsPathItemModel {
+	filteredPathItems := []StepParamsPathItemModel{}
+	for _, aOrigPthItm := range requestedCachePathItems {
+		if aOrigPthItm.Path == "" {
 			continue
 		}
-		aPath := path.Clean(aOrigPth)
+		aPath := path.Clean(aOrigPthItm.Path)
 		if aPath == "/" {
 			log.Println(" (!) Skipping: Failed to check the specified path: path was '/' - caching the whole root (/) directory is")
 			continue
 		}
-		fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
-		if err != nil {
-			log.Printf(" (!) Skipping (%s): Failed to check the specified path: %s", aOrigPth, err)
-			continue
-		}
-		if !isExist {
-			log.Printf(" (!) Skipping (%s): Specified path does not exist", aOrigPth)
-			continue
-		}
-		if !fileInfo.IsDir() {
-			if !fileInfo.Mode().IsRegular() {
-				log.Printf(" (i) File (%s) is not a regular file (it's a symlink, a device, or something similar) - skipping", aOrigPth)
+
+		// check the Path
+		{
+			fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
+			if err != nil {
+				log.Printf(" (!) Skipping (%s): Failed to check the specified path: %s", aOrigPthItm.Path, err)
 				continue
+			}
+			if !isExist {
+				log.Printf(" (!) Skipping (%s): Specified path does not exist", aOrigPthItm.Path)
+				continue
+			}
+
+			if !fileInfo.IsDir() {
+				if !fileInfo.Mode().IsRegular() {
+					log.Printf(" (i) File (%s) is not a regular file (it's a symlink, a device, or something similar) - skipping", aOrigPthItm.Path)
+					continue
+				}
 			}
 		}
 
-		filteredPaths = append(filteredPaths, aPath)
+		// check the Indicator File, if specified
+		if aOrigPthItm.IndicatorFilePath != "" {
+			{
+				fileInfo, isExist, err := pathutil.PathCheckAndInfos(aOrigPthItm.IndicatorFilePath)
+				if err != nil {
+					log.Printf(" (!) Skipping (%s): Failed to check the specified path: %s", aOrigPthItm.IndicatorFilePath, err)
+					continue
+				}
+				if !isExist {
+					log.Printf(" (!) Skipping (%s): Specified path does not exist", aOrigPthItm.IndicatorFilePath)
+					continue
+				}
+
+				if fileInfo.IsDir() {
+					log.Printf(" (i) The Indicator can only be a file, but a directory is specified (%s) - skipping", aOrigPthItm.IndicatorFilePath)
+					continue
+				}
+				if !fileInfo.Mode().IsRegular() {
+					log.Printf(" (i) The Indicator file (%s) is not a regular file (it's a symlink, a device, or something similar) - skipping", aOrigPthItm.IndicatorFilePath)
+					continue
+				}
+			}
+		}
+
+		filteredPathItems = append(filteredPathItems, aOrigPthItm)
 	}
-	return filteredPaths
+	return filteredPathItems
 }
 
-func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprint string, fingerprintsMeta map[string]FingerprintMetaModel) (string, error) {
+func createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, archiveContentFingerprint string, fingerprintsMeta map[string]FingerprintMetaModel) (string, error) {
 	cacheArchiveTmpBaseDirPth, err := pathutil.NormalizedOSTempDirPath("")
 	if err != nil {
 		return "", fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
@@ -299,8 +379,8 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 		Contents:         []CacheContentModel{},
 		FingerprintsMeta: fingerprintsMeta,
 	}
-	for idx, aPath := range pathsToCache {
-		aPath = path.Clean(aPath)
+	for idx, aPathItem := range pathItemsToCache {
+		aPath := path.Clean(aPathItem.Path)
 		absItemPath, err := pathutil.AbsPath(aPath)
 		if err != nil {
 			return "", fmt.Errorf("Failed to get Absolute path for item (%s): %s", aPath, err)
@@ -519,11 +599,11 @@ func main() {
 		log.Printf("=> stepParams: %#v", stepParams)
 	}
 
-	log.Printf("=> Oritinal list of paths to cache: %s", stepParams.Paths)
-	stepParams.Paths = cleanupCachePaths(stepParams.Paths)
-	log.Printf("=> Filtered paths to cache: %s", stepParams.Paths)
+	log.Printf("=> Oritinal list of paths to cache: %v", stepParams.PathItems)
+	stepParams.PathItems = cleanupCachePaths(stepParams.PathItems)
+	log.Printf("=> Filtered paths to cache: %s", stepParams.PathItems)
 
-	if len(stepParams.Paths) < 1 {
+	if len(stepParams.PathItems) < 1 {
 		log.Println("No paths specified to be cached, stopping.")
 		os.Exit(3)
 	}
@@ -555,7 +635,7 @@ func main() {
 	// Fingerprint
 	//
 
-	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.Paths)
+	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems)
 	if err != nil {
 		log.Fatalf(" [!] Failed to calculate fingerprint: %s", err)
 	}
@@ -583,7 +663,7 @@ func main() {
 	// Archive
 	//
 
-	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.Paths, fingerprintBase16Str, fingerprintsMeta)
+	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.PathItems, fingerprintBase16Str, fingerprintsMeta)
 	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
 	}
