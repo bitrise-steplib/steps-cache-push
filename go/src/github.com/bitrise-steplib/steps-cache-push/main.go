@@ -105,7 +105,13 @@ func fingerprintOfPaths(pths []string) ([]byte, error) {
 		if aPath == "/" {
 			return []byte{}, errors.New("Failed to check the specified path: caching the whole root (/) is forbidden (path was '/')")
 		}
-		fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
+
+		absPth, err := pathutil.AbsPath(aPath)
+		if err != nil {
+			return []byte{}, fmt.Errorf("Failed to get Absolute path of item (%s): %s", aPath, err)
+		}
+
+		fileInfo, isExist, err := pathutil.PathCheckAndInfos(absPth)
 		if err != nil {
 			return []byte{}, fmt.Errorf("Failed to check the specified path: %s", err)
 		}
@@ -211,21 +217,26 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 	}
 	for idx, aPath := range pathsToCache {
 		aPath = path.Clean(aPath)
-		fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
+		absItemPath, err := pathutil.AbsPath(aPath)
 		if err != nil {
-			return "", fmt.Errorf("Failed to check path (%s): %s", aPath, err)
+			return "", fmt.Errorf("Failed to get Absolute path for item (%s): %s", aPath, err)
+		}
+
+		fileInfo, isExist, err := pathutil.PathCheckAndInfos(absItemPath)
+		if err != nil {
+			return "", fmt.Errorf("Failed to check path (%s): %s", absItemPath, err)
 		}
 		if !isExist {
-			return "", fmt.Errorf("Path does not exist: %s", aPath)
+			return "", fmt.Errorf("Path does not exist: %s", absItemPath)
 		}
 
 		archiveCopyRsyncParams := []string{}
 		itemRelPathInArchive := fmt.Sprintf("c-%d", idx)
 
 		if fileInfo.IsDir() {
-			archiveCopyRsyncParams = []string{"-avhP", aPath + "/", filepath.Join(cacheContentDirPath, itemRelPathInArchive+"/")}
+			archiveCopyRsyncParams = []string{"-avhP", absItemPath + "/", filepath.Join(cacheContentDirPath, itemRelPathInArchive+"/")}
 		} else {
-			archiveCopyRsyncParams = []string{"-avhP", aPath, filepath.Join(cacheContentDirPath, itemRelPathInArchive)}
+			archiveCopyRsyncParams = []string{"-avhP", absItemPath, filepath.Join(cacheContentDirPath, itemRelPathInArchive)}
 		}
 
 		cacheInfo.Contents = append(cacheInfo.Contents, CacheContentModel{
@@ -237,8 +248,8 @@ func createCacheArchiveFromPaths(pathsToCache []string, archiveContentFingerprin
 			log.Printf(" $ rsync %s", archiveCopyRsyncParams)
 		}
 		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
-			log.Printf(" [!] Failed to sync archive target (%s), full output (stdout & stderr) was: %s", aPath, fullOut)
-			return "", fmt.Errorf("Failed to sync archive target (%s): %s", aPath, err)
+			log.Printf(" [!] Failed to sync archive target (%s), full output (stdout & stderr) was: %s", absItemPath, fullOut)
+			return "", fmt.Errorf("Failed to sync archive target (%s): %s", absItemPath, err)
 		}
 	}
 
