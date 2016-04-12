@@ -410,7 +410,7 @@ func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to generate Upload URL: %s", err)
 	}
-	log.Printf("   uploadURL: %s", uploadURL)
+	log.Printf("   [DEBUG] uploadURL: %s", uploadURL)
 
 	if err := _tryToUploadArchive(uploadURL, archiveFilePath); err != nil {
 		fmt.Println()
