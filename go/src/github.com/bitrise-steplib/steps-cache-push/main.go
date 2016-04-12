@@ -574,8 +574,10 @@ func main() {
 	}
 	log.Printf(" (i) Fingerprint (%s) does not match the previous one (%s), Cache update required", fingerprintBase16Str, previousCacheInfo.Fingerprint)
 
-	// Print a one-way diff, which files changed in the current
-	compareFingerprintMetas(fingerprintsMeta, previousCacheInfo.FingerprintsMeta)
+	// Print a diff, which files changed in the cache
+	if previousCacheInfo.Fingerprint != "" || gIsDebugMode {
+		compareFingerprintMetas(fingerprintsMeta, previousCacheInfo.FingerprintsMeta)
+	}
 
 	//
 	// Archive
