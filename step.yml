@@ -1,4 +1,4 @@
-title: "Bitrise.io - Cache Push/Upload"
+title: "Bitrise.io Cache:Push [BETA]"
 summary: WIP
 description: |-
   WIP
@@ -25,7 +25,7 @@ run_if: ".IsCI | and (not .IsPR)"
 inputs:
   - cache_paths: |
       $BITRISE_CACHE_DIR
-      ./Pods
+      ./Pods -> ./Podfile.lock
       $HOME/.gradle/wrapper
       ./.gradle
     opts:

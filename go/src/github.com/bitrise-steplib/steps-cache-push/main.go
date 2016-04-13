@@ -188,12 +188,12 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 			return []byte{}, fingerprintMeta, errors.New("Failed to check the specified path: caching the whole root (/) is forbidden (path was '/')")
 		}
 
-		absPth, err := pathutil.AbsPath(theFingerprintSourcePath)
+		fingerprintSourceAbsPth, err := pathutil.AbsPath(theFingerprintSourcePath)
 		if err != nil {
 			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to get Absolute path of item (%s): %s", theFingerprintSourcePath, err)
 		}
 
-		fileInfo, isExist, err := pathutil.PathCheckAndInfos(absPth)
+		fileInfo, isExist, err := pathutil.PathCheckAndInfos(fingerprintSourceAbsPth)
 		if err != nil {
 			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to check the specified path: %s", err)
 		}
@@ -202,7 +202,7 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 		}
 
 		if fileInfo.IsDir() {
-			err := filepath.Walk(theFingerprintSourcePath, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
+			err := filepath.Walk(fingerprintSourceAbsPth, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
 				if walkErr != nil {
 					log.Printf(" (!) Error checking file (%s): %s", aPath, walkErr)
 				}
@@ -236,7 +236,7 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", theFingerprintSourcePath, err)
 			}
 		} else {
-			fileFingerprintSource, err := fingerprintSourceStringOfFile(theFingerprintSourcePath, fileInfo)
+			fileFingerprintSource, err := fingerprintSourceStringOfFile(fingerprintSourceAbsPth, fileInfo)
 			if err != nil {
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", theFingerprintSourcePath, err)
 			}
@@ -307,6 +307,13 @@ func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []Step
 			log.Println(" (!) Skipping: Failed to check the specified path: path was '/' - caching the whole root (/) directory is")
 			continue
 		}
+
+		absItemPath, err := pathutil.AbsPath(aPath)
+		if err != nil {
+			log.Printf("Failed to get Absolute path for item (%s): %s", aPath, err)
+			continue
+		}
+		aPath = absItemPath
 
 		// check the Path
 		{
