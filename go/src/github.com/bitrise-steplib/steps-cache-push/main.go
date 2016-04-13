@@ -39,6 +39,7 @@ type StepParamsPathItemModel struct {
 // StepParamsModel ...
 type StepParamsModel struct {
 	PathItems            []StepParamsPathItemModel
+	IgnoreCheckOnPaths   []string
 	CacheAPIURL          string
 	CompareCacheInfoPath string
 	IsDebugMode          bool
@@ -100,6 +101,7 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
+	ignoreCheckOnPaths := os.Getenv("ignore_check_on_paths")
 	cacheAPIURL := os.Getenv("cache_api_url")
 
 	if cacheDirs == "" {
@@ -115,23 +117,43 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 		IsDebugMode:          os.Getenv("is_debug_mode") == "true",
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
-	for scanner.Scan() {
-		aCachePathItemDef := scanner.Text()
-		aCachePathItemDef = strings.TrimSpace(aCachePathItemDef)
-		if aCachePathItemDef == "" {
-			continue
-		}
+	// Cache Path Items
+	{
+		scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
+		for scanner.Scan() {
+			aCachePathItemDef := scanner.Text()
+			aCachePathItemDef = strings.TrimSpace(aCachePathItemDef)
+			if aCachePathItemDef == "" {
+				continue
+			}
 
-		pthItm, err := parseStepParamsPathItemModelFromString(aCachePathItemDef)
-		if err != nil {
-			return StepParamsModel{}, fmt.Errorf("Invalid item: %s", err)
-		}
+			pthItm, err := parseStepParamsPathItemModelFromString(aCachePathItemDef)
+			if err != nil {
+				return StepParamsModel{}, fmt.Errorf("Invalid item: %s", err)
+			}
 
-		stepParams.PathItems = append(stepParams.PathItems, pthItm)
+			stepParams.PathItems = append(stepParams.PathItems, pthItm)
+		}
+		if err := scanner.Err(); err != nil {
+			return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
+
+	// Ignore Check on Paths items
+	{
+		scanner := bufio.NewScanner(strings.NewReader(ignoreCheckOnPaths))
+		for scanner.Scan() {
+			aPthItmDef := scanner.Text()
+			aPthItmDef = strings.TrimSpace(aPthItmDef)
+			if aPthItmDef == "" {
+				continue
+			}
+
+			stepParams.IgnoreCheckOnPaths = append(stepParams.IgnoreCheckOnPaths, aPthItmDef)
+		}
+		if err := scanner.Err(); err != nil {
+			return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
+		}
 	}
 
 	return stepParams, nil
@@ -165,9 +187,28 @@ func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo) (string, er
 	return fmt.Sprintf("[%s]-[sha1:%x]-[%dB]-[0x%o]", pth, fileShaChecksum, fileInfo.Size(), fileInfo.Mode()), nil
 }
 
+func isShouldIgnorePathFromFingerprint(aPth string, ignorePaths []string) bool {
+	for _, anIgnorePth := range ignorePaths {
+		if strings.HasPrefix(aPth, anIgnorePth) {
+			return true
+		}
+	}
+	return false
+}
+
 // fingerprintOfPaths ...
-func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]FingerprintMetaModel, error) {
+func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string) ([]byte, map[string]FingerprintMetaModel, error) {
 	fingerprintMeta := map[string]FingerprintMetaModel{}
+
+	absIgnorePaths := []string{}
+	for _, anIgnorePth := range ignorePaths {
+		aAbsPth, err := pathutil.AbsPath(anIgnorePth)
+		if err != nil {
+			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to get Absolute path for ignore path item: %s", anIgnorePth)
+		}
+		absIgnorePaths = append(absIgnorePaths, aAbsPth)
+	}
+
 	fingerprintHash := sha1.New()
 	for _, aPathItem := range pathItms {
 		theFingerprintSourcePath := aPathItem.Path
@@ -201,6 +242,8 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 			return []byte{}, fingerprintMeta, errors.New("Specified path does not exist")
 		}
 
+		isFingerprintGenerated := false // at least one item from the path should generate a fingerprint for it!
+
 		if fileInfo.IsDir() {
 			err := filepath.Walk(fingerprintSourceAbsPth, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
 				if walkErr != nil {
@@ -216,6 +259,14 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 					}
 					return nil
 				}
+
+				if isShouldIgnorePathFromFingerprint(aPath, absIgnorePaths) {
+					if gIsDebugMode {
+						log.Printf(" [IGNORE] path from fingerprint: %s", aPath)
+					}
+					return nil
+				}
+
 				fileFingerprintSource, err := fingerprintSourceStringOfFile(aPath, aFileInfo)
 				if err != nil {
 					return fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", aPath, err)
@@ -230,12 +281,20 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 					return fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
 						fileFingerprintSource, err)
 				}
+
+				isFingerprintGenerated = true
 				return nil
 			})
 			if err != nil {
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", theFingerprintSourcePath, err)
 			}
 		} else {
+			if isShouldIgnorePathFromFingerprint(fingerprintSourceAbsPth, absIgnorePaths) {
+				log.Printf(" [IGNORE] path from fingerprint: %s", fingerprintSourceAbsPth)
+				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
+					theFingerprintSourcePath)
+			}
+
 			fileFingerprintSource, err := fingerprintSourceStringOfFile(fingerprintSourceAbsPth, fileInfo)
 			if err != nil {
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", theFingerprintSourcePath, err)
@@ -250,6 +309,12 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel) ([]byte, map[string]
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
 					fileFingerprintSource, err)
 			}
+			isFingerprintGenerated = true
+		}
+
+		if !isFingerprintGenerated {
+			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
+				theFingerprintSourcePath)
 		}
 	}
 
@@ -610,6 +675,10 @@ func main() {
 	stepParams.PathItems = cleanupCachePaths(stepParams.PathItems)
 	log.Printf("=> Filtered paths to cache: %s", stepParams.PathItems)
 
+	if len(stepParams.IgnoreCheckOnPaths) > 0 {
+		log.Printf("=> Ignore change check on paths: %s", stepParams.IgnoreCheckOnPaths)
+	}
+
 	if len(stepParams.PathItems) < 1 {
 		log.Println("No paths specified to be cached, stopping.")
 		os.Exit(3)
@@ -642,7 +711,7 @@ func main() {
 	// Fingerprint
 	//
 
-	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems)
+	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems, stepParams.IgnoreCheckOnPaths)
 	if err != nil {
 		log.Fatalf(" [!] Failed to calculate fingerprint: %s", err)
 	}

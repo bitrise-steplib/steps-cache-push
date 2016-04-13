@@ -90,3 +90,34 @@ func Test_fingerprintSourceStringOfFile(t *testing.T) {
 		require.Equal(t, expectedFingerprint, fingerprint)
 	}
 }
+
+func Test_isShouldIgnorePathFromFingerprint(t *testing.T) {
+	{
+		ignorePths := []string{
+			"ignore/rel",
+			"./ignore/exp-rel",
+			"~/ignore/rel-to-home",
+		}
+
+		isShould := isShouldIgnorePathFromFingerprint("not/ignored", ignorePths)
+		require.Equal(t, false, isShould)
+
+		isShould = isShouldIgnorePathFromFingerprint("not/ignore/rel", ignorePths)
+		require.Equal(t, false, isShould)
+
+		// ignore
+
+		isShould = isShouldIgnorePathFromFingerprint("ignore/rel", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/rel/under", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("./ignore/exp-rel/under", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("~/ignore/rel-to-home", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("~/ignore/rel-to-home/", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("~/ignore/rel-to-home/under", ignorePths)
+		require.Equal(t, true, isShould)
+	}
+}

@@ -36,6 +36,30 @@ inputs:
 
         A path item can be either a file or a directory.
       is_required: true
+  - ignore_check_on_paths: ""
+    opts:
+      title: "Ignore Paths from change check"
+      summary: "Ignore these Paths when checking for cache changes"
+      description: |-
+        These paths will be ignored from change checking.
+        If something changed under the specified path(s) and nothing else changed
+        then the cache won't be updated.
+
+        **These paths are NOT ignored from the cache**, if a path is located
+        inside a specified Cache Path item it'll be included in the cache,
+        just won't be checked for changes.
+
+        Important: you can't ignore a path which results in an invalid cache item.
+        For example, if you specify the path `a/path/to/cache` to be cached, you
+        can't ignore `a/path/to`, as that would ignore every file from checking
+        for a change - no fingerprint could be generated for `a/path/to/cache`.
+        You're free to ignore paths inside a Cache Path however, e.g.
+        if path is `a/path/to/cache` you're free to ignore `a/path/to/cache/.ignore-me`,
+        unless that's the only file inside `a/path/to/cache`.
+
+        The point is: you should not specify an ignore rule which would completely
+        ignore a specified Cache Path item, as that would result in a path which
+        can't be checked for updates/changes/fingerprints.
   - workdir: $BITRISE_SOURCE_DIR
     opts:
       title: Working directory path

@@ -50,6 +50,8 @@ workflows:
             ./DoesNotExist
             ../_tmp/ignored-samples/Pods/ -> ../_tmp/ignored-samples/Podfile.lock
             ../_samples/single_file/simple_text_file.txt
+        - ignore_check_on_paths: |-
+            ../_samples/dir1/copy.txt
         - cache_api_url: $BITRISE_CACHE_API_URL
         - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
 
