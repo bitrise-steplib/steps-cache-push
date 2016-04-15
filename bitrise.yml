@@ -45,6 +45,8 @@ workflows:
         is_skippable: false
         inputs:
         - is_debug_mode: "false"
+        - fingerprint_method: file-content-hash
+        # - fingerprint_method: file-mod-time
         - cache_paths: |
             ../_samples/dir1/
             ./DoesNotExist/

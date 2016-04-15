@@ -84,9 +84,16 @@ func Test_fingerprintSourceStringOfFile(t *testing.T) {
 		fileInfo, err := os.Stat(sampleFilePth)
 		require.NoError(t, err)
 
-		fingerprint, err := fingerprintSourceStringOfFile(sampleFilePth, fileInfo)
+		// file content hash method
+		fingerprint, err := fingerprintSourceStringOfFile(sampleFilePth, fileInfo, fingerprintMethodIDContentChecksum)
 		require.NoError(t, err)
-		expectedFingerprint := "[./_samples/simple_text_file.txt]-[sha1:002de9a34df93e596a387b440fd83023452e6ec5]-[26B]-[0x644]"
+		expectedFingerprint := "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[sha1:002de9a34df93e596a387b440fd83023452e6ec5]"
+		require.Equal(t, expectedFingerprint, fingerprint)
+
+		// file mod method
+		fingerprint, err = fingerprintSourceStringOfFile(sampleFilePth, fileInfo, fingerprintMethodIDFileModTime)
+		require.NoError(t, err)
+		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1458937589]"
 		require.Equal(t, expectedFingerprint, fingerprint)
 	}
 }

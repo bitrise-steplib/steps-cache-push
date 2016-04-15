@@ -1,8 +1,6 @@
 title: "Bitrise.io Cache:Push [BETA]"
 summary: WIP
 description: |-
-  WIP
-
   It won't upload if the Cache did not change, nor in case of PullRequest build.
 website: https://github.com/bitrise-steplib/steps-cache-push
 source_code_url: https://github.com/bitrise-steplib/steps-cache-push.git
@@ -25,8 +23,10 @@ run_if: ".IsCI | and (not .IsPR)"
 inputs:
   - cache_paths: |
       $BITRISE_CACHE_DIR
+
       ./Pods -> ./Podfile.lock
-      $HOME/.gradle/wrapper
+
+      $HOME/.gradle
       ./.gradle
     opts:
       title: "Cache paths"
@@ -35,6 +35,15 @@ inputs:
         Cache these paths. Separate paths with a newline.
 
         A path item can be either a file or a directory.
+
+        You can also specify an "update indicator file" with the `->`
+        syntax: `update/this -> if/this/file/is/updated`.
+        *The indicator can only be a file!*
+
+        If you have a path in the list which doesn't exist that will not cause
+        this Step to fail. It'll be logged but the Step will try to gather
+        as many specified & valid paths as it can, and just print warning
+        about the invalid items.
       is_required: true
   - ignore_check_on_paths: ""
     opts:
@@ -66,6 +75,39 @@ inputs:
       summary: Working directory path
       description: |-
         Working directory path - should be an absolute path.
+  - fingerprint_method: "file-content-hash"
+    opts:
+      title: Fingerprint Method
+      summary: Fingerprint method, used for checking file changes.
+      description: |-
+        The specified Fingerprint Method will be used to calculate
+        fingerprints for the cached files.
+
+        The (file) fingerprint is used to check whether
+        the cached files did change - if it changed a new cache will be generated,
+        if the fingerprint matches the previous cache version's fingerprint then
+        no new cache will be generated.
+
+        **Regardless of which method you choose** the following file attributes will
+        be used to create the fingerprint **in addition** to the method you choose:
+
+        * File path
+        * File size
+        * File permission bits
+
+        Information about the options:
+
+        * `file-content-hash` : create a file content checksum hash for every file in the cache,
+          and use that as the fingerprint source of the file. This means that **the full file content will be loaded** in
+          order to create the checksum hash!
+        * `file-mod-time` : use the file's "modified at" time information. For larger files this method
+          can be significantly faster, as the file don't have to be loaded to calculate this information!
+
+        **Note**: in case of "update indicator files" the fingerprint method will always be `file-content-hash`,
+        regardless of which option you select here.
+      value_options:
+      - file-content-hash
+      - file-mod-time
   - is_debug_mode: "false"
     opts:
       title: "Debug mode?"
