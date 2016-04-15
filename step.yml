@@ -46,7 +46,9 @@ inputs:
         about the invalid items.
       is_required: true
   - ignore_check_on_paths: |-
-      $HOME/.gradle/*.bin
+      $HOME/.gradle/caches/*.lock
+      ./.gradle/*.lock
+      ./.gradle/*.bin
     opts:
       title: "Ignore Paths from change check"
       summary: "Ignore these Paths when checking for cache changes"
