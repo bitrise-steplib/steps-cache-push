@@ -104,7 +104,11 @@ func Test_isShouldIgnorePathFromFingerprint(t *testing.T) {
 			"ignore/rel",
 			"./ignore/exp-rel",
 			"~/ignore/rel-to-home",
+			"ignore/glob/*.ext",
+			"ignore/glob/a/*/b/*",
 		}
+
+		// Prefix - don't ignore
 
 		isShould := isShouldIgnorePathFromFingerprint("not/ignored", ignorePths)
 		require.Equal(t, false, isShould)
@@ -112,7 +116,7 @@ func Test_isShouldIgnorePathFromFingerprint(t *testing.T) {
 		isShould = isShouldIgnorePathFromFingerprint("not/ignore/rel", ignorePths)
 		require.Equal(t, false, isShould)
 
-		// ignore
+		// Prefix - ignore
 
 		isShould = isShouldIgnorePathFromFingerprint("ignore/rel", ignorePths)
 		require.Equal(t, true, isShould)
@@ -125,6 +129,39 @@ func Test_isShouldIgnorePathFromFingerprint(t *testing.T) {
 		isShould = isShouldIgnorePathFromFingerprint("~/ignore/rel-to-home/", ignorePths)
 		require.Equal(t, true, isShould)
 		isShould = isShouldIgnorePathFromFingerprint("~/ignore/rel-to-home/under", ignorePths)
+		require.Equal(t, true, isShould)
+
+		// Glob - don't ignore
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a.2ext", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/b.2ext", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a.ext2", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/b.ext2", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/b.ext/2", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a.ext/2", ignorePths)
+		require.Equal(t, false, isShould)
+
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/x/b", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/b/x/a/x", ignorePths)
+		require.Equal(t, false, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/b/x/y/a/x", ignorePths)
+		require.Equal(t, false, isShould)
+
+		// Glob - ignore
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a.ext", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/b.ext", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/x/b/x", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/x/y/b/x", ignorePths)
+		require.Equal(t, true, isShould)
+		isShould = isShouldIgnorePathFromFingerprint("ignore/glob/a/x/y/b/x/y", ignorePths)
 		require.Equal(t, true, isShould)
 	}
 }

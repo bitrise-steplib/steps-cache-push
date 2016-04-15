@@ -45,7 +45,8 @@ inputs:
         as many specified & valid paths as it can, and just print warning
         about the invalid items.
       is_required: true
-  - ignore_check_on_paths: ""
+  - ignore_check_on_paths: |-
+      $HOME/.gradle/*.bin
     opts:
       title: "Ignore Paths from change check"
       summary: "Ignore these Paths when checking for cache changes"
@@ -57,6 +58,10 @@ inputs:
         **These paths are NOT ignored from the cache**, if a path is located
         inside a specified Cache Path item it'll be included in the cache,
         just won't be checked for changes.
+
+        The path can also include the `*` wildcard character, which will
+        do a **string** based compare (e.g. `a/*/b` will match `a/1/2/3/b` too,
+        not just `a/x/b`).
 
         Important: you can't ignore a path which results in an invalid cache item.
         For example, if you specify the path `a/path/to/cache` to be cached, you

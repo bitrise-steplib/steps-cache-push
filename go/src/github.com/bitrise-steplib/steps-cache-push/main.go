@@ -20,6 +20,7 @@ import (
 
 	"github.com/bitrise-io/go-utils/cmdex"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/ryanuber/go-glob"
 )
 
 const (
@@ -207,8 +208,18 @@ func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo, fingerprint
 
 func isShouldIgnorePathFromFingerprint(aPth string, ignorePaths []string) bool {
 	for _, anIgnorePth := range ignorePaths {
-		if strings.HasPrefix(aPth, anIgnorePth) {
-			return true
+		if strings.Contains(anIgnorePth, "*") {
+			// glob
+			if glob.Glob(anIgnorePth, aPth) {
+				// log.Printf(" [IGNORE:glob] %s (%s)", aPth, anIgnorePth)
+				return true
+			}
+		} else {
+			// prefix
+			if strings.HasPrefix(aPth, anIgnorePth) {
+				// log.Printf(" [IGNORE:prefix] %s (%s)", aPth, anIgnorePth)
+				return true
+			}
 		}
 	}
 	return false
