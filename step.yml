@@ -1,7 +1,15 @@
 title: "Bitrise.io Cache:Push [BETA]"
-summary: WIP
+summary: "Updates the Cache, if required"
 description: |-
-  It won't upload if the Cache did not change, nor in case of PullRequest build.
+  This Step checks whether the Cache have to be updated (based on the
+  `Cache Paths` and `Ignore Paths from change check` inputs),
+  and if it have to be it will create a new cache archive and upload it.
+
+  It won't update/upload the Cache if the Cache did not change,
+  nor in case of Pull Request builds (unless you change the `run_if` property of the Step).
+
+  You can find a setup and tips & tricks guide on the Bitrise DevCenter
+  at [http://devcenter.bitrise.io/docs/using-the-build-cache](http://devcenter.bitrise.io/docs/using-the-build-cache).
 website: https://github.com/bitrise-steplib/steps-cache-push
 source_code_url: https://github.com/bitrise-steplib/steps-cache-push.git
 support_url: https://github.com/bitrise-steplib/steps-cache-push/issues
