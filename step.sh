@@ -12,5 +12,6 @@ if [ ! -z "$workdir" ] ; then
   cd "$workdir"
 fi
 
+echo
 go run "${THIS_SCRIPT_DIR}/go/src/github.com/bitrise-steplib/steps-cache-push/main.go"
 exit $?

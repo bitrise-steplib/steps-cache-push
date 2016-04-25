@@ -603,12 +603,14 @@ func _tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to read response: %s", err)
 	}
-	log.Printf("=> Upload response: %s", responseBytes)
 
 	if resp.StatusCode != 200 {
+		log.Printf("=> Upload response: %s", responseBytes)
 		return fmt.Errorf("Failed to upload file, response code was: %d", resp.StatusCode)
 	}
-	log.Printf("=> Upload response code: %d", resp.StatusCode)
+	if gIsDebugMode {
+		log.Printf("=> Upload response code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
@@ -712,12 +714,23 @@ func main() {
 		log.Printf("=> stepParams: %#v", stepParams)
 	}
 
-	log.Printf("=> Provided list of paths to cache: %v", stepParams.PathItems)
+	log.Println(colorstring.Blue("=> Provided list of paths to cache:"))
+	for _, aPathItm := range stepParams.PathItems {
+		log.Printf(" * %s", aPathItm.Path)
+	}
 	stepParams.PathItems = cleanupCachePaths(stepParams.PathItems)
-	log.Printf("=> Filtered paths to cache: %s", stepParams.PathItems)
+	fmt.Println()
+	log.Println(colorstring.Green("=> (Filtered) Paths to cache:"))
+	for _, aPathItm := range stepParams.PathItems {
+		log.Printf(" "+colorstring.Green("*")+" %s", aPathItm.Path)
+	}
+	fmt.Println()
 
 	if len(stepParams.IgnoreCheckOnPaths) > 0 {
-		log.Printf("=> Ignore change-check on paths: %s", stepParams.IgnoreCheckOnPaths)
+		log.Println(colorstring.Yellow("=> Ignore change-check on paths:"))
+		for _, aIgnorePth := range stepParams.IgnoreCheckOnPaths {
+			log.Printf(" "+colorstring.Yellow("x")+" %s", aIgnorePth)
+		}
 	}
 
 	if len(stepParams.PathItems) < 1 {
@@ -729,6 +742,7 @@ func main() {
 	// Load Previous Cache Info, if any
 	//
 
+	fmt.Println()
 	previousCacheInfo := CacheInfosModel{}
 	if stepParams.CompareCacheInfoPath != "" {
 		if gIsDebugMode {
@@ -741,7 +755,7 @@ func main() {
 			previousCacheInfo = cacheInfo
 		}
 	} else {
-		log.Println("No base Cache Info found for compare - New cache will be created")
+		log.Println(colorstring.Blue("No base Cache Info found for compare - New cache will be created"))
 	}
 	// normalize
 	if previousCacheInfo.FingerprintsMeta == nil {
@@ -753,7 +767,7 @@ func main() {
 	//
 
 	fmt.Println()
-	log.Println("=> Calculating Fingerprint ...")
+	log.Println(colorstring.Blue("=> Calculating Fingerprint ..."))
 	log.Printf("==> Fingerprint method: %s", stepParams.FingerprintMethodID)
 	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems, stepParams.IgnoreCheckOnPaths, stepParams.FingerprintMethodID)
 	if err != nil {
@@ -769,7 +783,7 @@ func main() {
 		log.Printf("Comparing fingerprint with cache info from: %s", previousCacheInfo.Fingerprint)
 	}
 	if previousCacheInfo.Fingerprint == fingerprintBase16Str {
-		log.Println(" => (i) Fingerprint matches the original one, no need to update Cache - DONE")
+		log.Println(colorstring.Green(" => (i) Fingerprint matches the original one, no need to update Cache - DONE"))
 		return
 	}
 	if previousCacheInfo.Fingerprint != "" {
@@ -786,7 +800,7 @@ func main() {
 	//
 
 	fmt.Println()
-	log.Println("=> Creating Archive ...")
+	log.Println(colorstring.Blue("=> Creating Archive ..."))
 	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.PathItems, fingerprintBase16Str, fingerprintsMeta)
 	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
@@ -794,17 +808,17 @@ func main() {
 	if gIsDebugMode {
 		log.Printf(" => archiveFilePath: %s", archiveFilePath)
 	}
-	log.Println("=> Creating Archive - DONE")
+	log.Println(colorstring.Green("=> Creating Archive - DONE"))
 
 	//
 	// Upload
 	//
 	fmt.Println()
-	log.Println("=> Uploading ...")
+	log.Println(colorstring.Blue("=> Uploading ..."))
 	if err := uploadArchive(stepParams, archiveFilePath); err != nil {
 		log.Fatalf(" [!] Failed to upload Cache Archive: %s", err)
 	}
-	log.Println("=> Upload - DONE")
+	log.Println(colorstring.Green("=> Upload - DONE"))
 
-	log.Println("=> FINISHED")
+	log.Println(colorstring.Green("=> FINISHED"))
 }
