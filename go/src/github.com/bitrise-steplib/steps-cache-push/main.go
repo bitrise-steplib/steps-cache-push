@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/bitrise-io/go-utils/cmdex"
+	"github.com/bitrise-io/go-utils/colorstring"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/ryanuber/go-glob"
 )
@@ -239,7 +240,11 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 	}
 
 	fingerprintHash := sha1.New()
+	isFingerprintGenerated := false // at least one item from the path should generate a fingerprint for it!
+
 	for _, aPathItem := range pathItms {
+		isFingerprintGeneratedForPathItem := false
+
 		theFingerprintSourcePath := aPathItem.Path
 		isIndicatorFile := false
 		if aPathItem.IndicatorFilePath != "" {
@@ -272,8 +277,6 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 		if !isExist {
 			return []byte{}, fingerprintMeta, errors.New("Specified path does not exist")
 		}
-
-		isFingerprintGenerated := false // at least one item from the path should generate a fingerprint for it!
 
 		if fileInfo.IsDir() {
 			err := filepath.Walk(fingerprintSourceAbsPth, func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
@@ -313,7 +316,7 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 						fileFingerprintSource, err)
 				}
 
-				isFingerprintGenerated = true
+				isFingerprintGeneratedForPathItem = true
 				return nil
 			})
 			if err != nil {
@@ -344,13 +347,18 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
 					fileFingerprintSource, err)
 			}
-			isFingerprintGenerated = true
+			isFingerprintGeneratedForPathItem = true
 		}
 
-		if !isFingerprintGenerated {
-			return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
-				theFingerprintSourcePath)
+		if isFingerprintGeneratedForPathItem {
+			isFingerprintGenerated = true
+		} else {
+			log.Println(colorstring.Yellowf(" (i) No fingerprint generated for path: (%s) - no file found to generate one", theFingerprintSourcePath))
 		}
+	}
+
+	if !isFingerprintGenerated {
+		return []byte{}, fingerprintMeta, errors.New("Failed to generate fingerprint for paths - no file found to generate one")
 	}
 
 	return fingerprintHash.Sum(nil), fingerprintMeta, nil

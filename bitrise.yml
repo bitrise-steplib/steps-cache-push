@@ -48,6 +48,7 @@ workflows:
         - fingerprint_method: file-content-hash
         # - fingerprint_method: file-mod-time
         - cache_paths: |
+            $BITRISE_CACHE_DIR
             ../_samples/dir1/
             ./DoesNotExist/
             ./DoesNotExist

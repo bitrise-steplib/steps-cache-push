@@ -55,6 +55,7 @@ inputs:
       is_required: true
   - ignore_check_on_paths: |-
       $HOME/.gradle/caches/*.lock
+      $HOME/.gradle/caches/*.bin
       ./.gradle/*.lock
       ./.gradle/*.bin
     opts:
