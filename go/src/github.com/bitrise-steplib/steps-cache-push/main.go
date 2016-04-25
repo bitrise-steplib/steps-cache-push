@@ -412,7 +412,7 @@ func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []Step
 		}
 		aPath := path.Clean(aOrigPthItm.Path)
 		if aPath == "/" {
-			log.Println(" (!) Skipping: Failed to check the specified path: path was '/' - caching the whole root (/) directory is")
+			log.Println(" " + colorstring.Yellow("(!) Skipping") + ": Failed to check the specified path: path was '/' - caching the whole root (/) directory is")
 			continue
 		}
 
@@ -427,11 +427,11 @@ func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []Step
 		{
 			fileInfo, isExist, err := pathutil.PathCheckAndInfos(aPath)
 			if err != nil {
-				log.Printf(" (!) Skipping (%s): Failed to check the specified path: %s", aOrigPthItm.Path, err)
+				log.Printf(" "+colorstring.Yellow("(!) Skipping")+" (%s): Failed to check the specified path: %s", aOrigPthItm.Path, err)
 				continue
 			}
 			if !isExist {
-				log.Printf(" (!) Skipping (%s): Specified path does not exist", aOrigPthItm.Path)
+				log.Printf(" "+colorstring.Yellow("(!) Skipping")+" (%s): Specified path does not exist", aOrigPthItm.Path)
 				continue
 			}
 
@@ -448,11 +448,11 @@ func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []Step
 			{
 				fileInfo, isExist, err := pathutil.PathCheckAndInfos(aOrigPthItm.IndicatorFilePath)
 				if err != nil {
-					log.Printf(" (!) Skipping (%s): Failed to check the specified path: %s", aOrigPthItm.IndicatorFilePath, err)
+					log.Printf(" "+colorstring.Yellow("(!) Skipping")+" (%s): Failed to check the specified path: %s", aOrigPthItm.IndicatorFilePath, err)
 					continue
 				}
 				if !isExist {
-					log.Printf(" (!) Skipping (%s): Specified path does not exist", aOrigPthItm.IndicatorFilePath)
+					log.Printf(" "+colorstring.Yellow("(!) Skipping")+" (%s): Specified path does not exist", aOrigPthItm.IndicatorFilePath)
 					continue
 				}
 
