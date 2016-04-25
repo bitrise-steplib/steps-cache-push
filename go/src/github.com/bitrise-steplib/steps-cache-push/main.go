@@ -722,7 +722,11 @@ func main() {
 	fmt.Println()
 	log.Println(colorstring.Green("=> (Filtered) Paths to cache:"))
 	for _, aPathItm := range stepParams.PathItems {
-		log.Printf(" "+colorstring.Green("*")+" %s", aPathItm.Path)
+		itmLogStr := " " + colorstring.Green("*") + " " + aPathItm.Path
+		if aPathItm.IndicatorFilePath != "" {
+			itmLogStr = itmLogStr + " " + colorstring.Green("->") + " " + aPathItm.IndicatorFilePath
+		}
+		log.Println(itmLogStr)
 	}
 	fmt.Println()
 
@@ -750,13 +754,14 @@ func main() {
 		}
 		cacheInfo, err := readCacheInfoFromFile(stepParams.CompareCacheInfoPath)
 		if err != nil {
-			log.Printf(" [!] Failed to read Cache Info for compare: %s", err)
+			log.Printf(" "+colorstring.Red("[!] Failed to read Cache Info for compare")+": %s", err)
 		} else {
 			previousCacheInfo = cacheInfo
 		}
 	} else {
-		log.Println(colorstring.Blue("No base Cache Info found for compare - New cache will be created"))
+		log.Println(colorstring.Blue("No base Cache Info found for compare"))
 	}
+	log.Println(colorstring.Blue("New cache will be created ..."))
 	// normalize
 	if previousCacheInfo.FingerprintsMeta == nil {
 		previousCacheInfo.FingerprintsMeta = map[string]FingerprintMetaModel{}
