@@ -1,4 +1,4 @@
-title: "Bitrise.io Cache:Push [BETA]"
+title: "Bitrise.io Cache:Push"
 summary: "Updates the Cache, if required"
 description: |-
   This Step checks whether the Cache have to be updated (based on the
@@ -9,7 +9,7 @@ description: |-
   nor in case of Pull Request builds (unless you change the `run_if` property of the Step).
 
   You can find a setup and tips & tricks guide on the Bitrise DevCenter
-  at [http://devcenter.bitrise.io/docs/using-the-build-cache](http://devcenter.bitrise.io/docs/using-the-build-cache).
+  at [http://devcenter.bitrise.io/caching/about-caching/](http://devcenter.bitrise.io/caching/about-caching/).
 website: https://github.com/bitrise-steplib/steps-cache-push
 source_code_url: https://github.com/bitrise-steplib/steps-cache-push.git
 support_url: https://github.com/bitrise-steplib/steps-cache-push/issues
