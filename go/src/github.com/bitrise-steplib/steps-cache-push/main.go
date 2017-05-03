@@ -783,7 +783,7 @@ func main() {
 		if gIsDebugMode {
 			log.Printf("=> Loading Previous Cache Info from: %s", stepParams.CompareCacheInfoPath)
 		}
-		start = time.Now()
+
 		cacheInfo, err := readCacheInfoFromFile(stepParams.CompareCacheInfoPath)
 		if err != nil {
 			log.Printf(" "+colorstring.Red("[!] Failed to read Cache Info for compare")+": %s", err)
