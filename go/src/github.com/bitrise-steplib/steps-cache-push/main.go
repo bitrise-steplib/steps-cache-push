@@ -564,8 +564,8 @@ func createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, arc
 
 	cacheArchiveFileName := "cache.tar.gz"
 	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
-	log.Printf("### won't compress")
-	tarCmdParams := []string{"-cvf", cacheArchiveFilePath, "."}
+	log.Printf("### will compress")
+	tarCmdParams := []string{"-cvfz", cacheArchiveFilePath, "."}
 	if gIsDebugMode {
 		log.Printf(" $ tar %s", tarCmdParams)
 	}
