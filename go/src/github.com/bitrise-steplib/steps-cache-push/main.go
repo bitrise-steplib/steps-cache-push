@@ -197,7 +197,7 @@ func sha1ChecksumOfFile(pth string) ([]byte, error) {
 }
 
 func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo, fingerprintMethodID string) (string, error) {
-	starttime := time.Now()
+	//starttime := time.Now()
 	fpMethodResult := ""
 	if fingerprintMethodID == fingerprintMethodIDContentChecksum {
 		fileShaChecksum, err := sha1ChecksumOfFile(pth)
@@ -212,30 +212,30 @@ func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo, fingerprint
 	}
 
 	r := fmt.Sprintf("[%s]-[%dB]-[0x%o]-[%s]", pth, fileInfo.Size(), fileInfo.Mode(), fpMethodResult)
-	log.Printf("### fingerprintSourceStringOfFile %s", time.Since(starttime))
+	//log.Printf("### fingerprintSourceStringOfFile %s", time.Since(starttime))
 	return r, nil
 }
 
 func isShouldIgnorePathFromFingerprint(aPth string, ignorePaths []string) bool {
-	starttime := time.Now()
+	//starttime := time.Now()
 	for _, anIgnorePth := range ignorePaths {
 		if strings.Contains(anIgnorePth, "*") {
 			// glob
 			if glob.Glob(anIgnorePth, aPth) {
 				// log.Printf(" [IGNORE:glob] %s (%s)", aPth, anIgnorePth)
-				log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
+				//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 				return true
 			}
 		} else {
 			// prefix
 			if strings.HasPrefix(aPth, anIgnorePth) {
 				// log.Printf(" [IGNORE:prefix] %s (%s)", aPth, anIgnorePth)
-				log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
+				//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 				return true
 			}
 		}
 	}
-	log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
+	//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 	return false
 }
 
