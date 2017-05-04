@@ -49,6 +49,7 @@ type StepParamsModel struct {
 	CompareCacheInfoPath string
 	IsDebugMode          bool
 	FingerprintMethodID  string
+	CompressArchive      bool
 }
 
 // CacheContentModel ...
@@ -106,13 +107,11 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
-
-	starttime := time.Now()
-
 	cacheDirs := os.Getenv("cache_paths")
 	ignoreCheckOnPaths := os.Getenv("ignore_check_on_paths")
 	cacheAPIURL := os.Getenv("cache_api_url")
 	fingerprintMethodID := os.Getenv("fingerprint_method")
+	compressArchive := os.Getenv("compress_archive")
 
 	if cacheDirs == "" {
 		return StepParamsModel{}, errors.New("No cache_paths input specified")
@@ -123,11 +122,18 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	if fingerprintMethodID != fingerprintMethodIDContentChecksum && fingerprintMethodID != fingerprintMethodIDFileModTime {
 		return StepParamsModel{}, fmt.Errorf("fingerprint_method (%s) is invalid", fingerprintMethodID)
 	}
+	if compressArchive == "" {
+		return StepParamsModel{}, errors.New("No compress_archive input specified")
+	}
+	if compressArchive != "true" && compressArchive != "false" {
+		return StepParamsModel{}, fmt.Errorf("compress_archive (%s) is invalid", compressArchive)
+	}
 
 	stepParams := StepParamsModel{
 		CacheAPIURL:          cacheAPIURL,
 		CompareCacheInfoPath: os.Getenv("compare_cache_info_path"),
 		IsDebugMode:          os.Getenv("is_debug_mode") == "true",
+		CompressArchive:      compressArchive == "true",
 		FingerprintMethodID:  fingerprintMethodID,
 	}
 
@@ -169,12 +175,11 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 			return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
 		}
 	}
-	log.Printf("### CreateStepParamsFromEnvs %s", time.Since(starttime))
+
 	return stepParams, nil
 }
 
 func sha1ChecksumOfFile(pth string) ([]byte, error) {
-	starttime := time.Now()
 	fileHasher := sha1.New()
 
 	f, err := os.Open(pth)
@@ -191,13 +196,10 @@ func sha1ChecksumOfFile(pth string) ([]byte, error) {
 		return nil, fmt.Errorf("Failed create hash of file, error: %s", err)
 	}
 
-	r := fileHasher.Sum(nil)
-	log.Printf("### sha1ChecksumOfFile %s", time.Since(starttime))
-	return r, nil
+	return fileHasher.Sum(nil), nil
 }
 
 func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo, fingerprintMethodID string) (string, error) {
-	//starttime := time.Now()
 	fpMethodResult := ""
 	if fingerprintMethodID == fingerprintMethodIDContentChecksum {
 		fileShaChecksum, err := sha1ChecksumOfFile(pth)
@@ -211,37 +213,30 @@ func fingerprintSourceStringOfFile(pth string, fileInfo os.FileInfo, fingerprint
 		return "", fmt.Errorf("Unsupported Fingerprint Method: %s", fingerprintMethodID)
 	}
 
-	r := fmt.Sprintf("[%s]-[%dB]-[0x%o]-[%s]", pth, fileInfo.Size(), fileInfo.Mode(), fpMethodResult)
-	//log.Printf("### fingerprintSourceStringOfFile %s", time.Since(starttime))
-	return r, nil
+	return fmt.Sprintf("[%s]-[%dB]-[0x%o]-[%s]", pth, fileInfo.Size(), fileInfo.Mode(), fpMethodResult), nil
 }
 
 func isShouldIgnorePathFromFingerprint(aPth string, ignorePaths []string) bool {
-	//starttime := time.Now()
 	for _, anIgnorePth := range ignorePaths {
 		if strings.Contains(anIgnorePth, "*") {
 			// glob
 			if glob.Glob(anIgnorePth, aPth) {
 				// log.Printf(" [IGNORE:glob] %s (%s)", aPth, anIgnorePth)
-				//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 				return true
 			}
 		} else {
 			// prefix
 			if strings.HasPrefix(aPth, anIgnorePth) {
 				// log.Printf(" [IGNORE:prefix] %s (%s)", aPth, anIgnorePth)
-				//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 				return true
 			}
 		}
 	}
-	//log.Printf("### isShouldIgnorePathFromFingerprint %s", time.Since(starttime))
 	return false
 }
 
 // fingerprintOfPaths ...
 func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string, fingerprintMethodID string) ([]byte, map[string]FingerprintMetaModel, error) {
-	starttime := time.Now()
 	fingerprintMeta := map[string]FingerprintMetaModel{}
 
 	absIgnorePaths := []string{}
@@ -374,13 +369,11 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 	if !isFingerprintGenerated {
 		return []byte{}, fingerprintMeta, errors.New("Failed to generate fingerprint for paths - no file found to generate one")
 	}
-	r := fingerprintHash.Sum(nil)
-	log.Printf("### fingerprintOfPaths %s", time.Since(starttime))
-	return r, fingerprintMeta, nil
+
+	return fingerprintHash.Sum(nil), fingerprintMeta, nil
 }
 
 func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMetaModel) {
-	starttime := time.Now()
 	if currentMeta == nil {
 		log.Printf(" (!) compareFingerprintMetas: Current Fingerprint Metas empty - can't compare")
 		return
@@ -389,6 +382,20 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 		log.Printf(" (!) compareFingerprintMetas: Previous Fingerprint Metas empty - can't compare")
 		return
 	}
+
+	logCount := 0
+	redactedPrintf := func(counts bool, format string, v ...interface{}) {
+		if logCount < 10 {
+			log.Printf(format, v)
+		}
+		if logCount == 10 {
+			log.Printf("List truncated...")
+		}
+		if counts && !gIsDebugMode {
+			logCount++
+		}
+	}
+
 	fmt.Println()
 	log.Println("=> Comparing cache meta information ...")
 
@@ -400,29 +407,27 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 	for aPath, currValue := range currentMeta {
 		prevValue, isFound := previousMeta[aPath]
 		if !isFound {
-			log.Printf("   [ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
+			redactedPrintf(true, "   [ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
 		} else {
 			delete(prevItmsLookup, aPath)
 			if currValue != prevValue {
-				log.Printf(" (i) File changed: %s", aPath)
-				log.Printf("     Previous fingerprint (source): %s", prevValue)
-				log.Printf("     Current  fingerprint (source): %s", currValue)
+				redactedPrintf(true, " (i) File changed: %s", aPath)
+				redactedPrintf(false, "     Previous fingerprint (source): %s", prevValue)
+				redactedPrintf(false, "     Current  fingerprint (source): %s", currValue)
 			} else if gIsDebugMode {
-				log.Printf(" (i) File fingerprint (source) match: %s", aPath)
+				redactedPrintf(false, " (i) File fingerprint (source) match: %s", aPath)
 			}
 		}
 	}
 
 	for aPath := range prevItmsLookup {
-		log.Printf("   [REMOVED] (File (meta info about the file) is no longer in the cache, but it was in the previous one): %s", aPath)
+		redactedPrintf(true, "   [REMOVED] (File (meta info about the file) is no longer in the cache, but it was in the previous one): %s", aPath)
 	}
 
 	fmt.Println()
-	log.Printf("### compareFingerprintMetas %s", time.Since(starttime))
 }
 
 func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []StepParamsPathItemModel {
-	starttime := time.Now()
 	filteredPathItems := []StepParamsPathItemModel{}
 	for _, aOrigPthItm := range requestedCachePathItems {
 		if aOrigPthItm.Path == "" {
@@ -487,12 +492,10 @@ func cleanupCachePaths(requestedCachePathItems []StepParamsPathItemModel) []Step
 
 		filteredPathItems = append(filteredPathItems, aOrigPthItm)
 	}
-	log.Printf("### cleanupCachePaths %s", time.Since(starttime))
 	return filteredPathItems
 }
 
-func createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, archiveContentFingerprint string, fingerprintsMeta map[string]FingerprintMetaModel) (string, error) {
-	starttime := time.Now()
+func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, archiveContentFingerprint string, fingerprintsMeta map[string]FingerprintMetaModel) (string, error) {
 	cacheArchiveTmpBaseDirPth, err := pathutil.NormalizedOSTempDirPath("")
 	if err != nil {
 		return "", fmt.Errorf("Failed to create temporary Cache Archive directory: %s", err)
@@ -564,8 +567,13 @@ func createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, arc
 
 	cacheArchiveFileName := "cache.tar.gz"
 	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
-	log.Printf("### will compress")
-	tarCmdParams := []string{"-cvzf", cacheArchiveFilePath, "."}
+
+	tarFlags := "-cvf"
+	if stepParams.CompressArchive {
+		tarFlags = "-cvzf"
+	}
+
+	tarCmdParams := []string{tarFlags, cacheArchiveFilePath, "."}
 	if gIsDebugMode {
 		log.Printf(" $ tar %s", tarCmdParams)
 	}
@@ -574,12 +582,10 @@ func createCacheArchiveFromPaths(pathItemsToCache []StepParamsPathItemModel, arc
 		return "", fmt.Errorf("Failed to create cache archive, error was: %s", err)
 	}
 
-	log.Printf("### createCacheArchiveFromPaths %s", time.Since(starttime))
 	return cacheArchiveFilePath, nil
 }
 
 func _tryToUploadArchive(uploadURL string, archiveFilePath string) error {
-	starttime := time.Now()
 	archFile, err := os.Open(archiveFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
@@ -634,7 +640,7 @@ func _tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if gIsDebugMode {
 		log.Printf("=> Upload response code: %d", resp.StatusCode)
 	}
-	log.Printf("### _tryToUploadArchive %s", time.Since(starttime))
+
 	return nil
 }
 
@@ -649,7 +655,6 @@ type GenerateUploadURLRespModel struct {
 }
 
 func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
-	starttime := time.Now()
 	requestDataModel := CacheUploadAPIRequestDataModel{
 		FileSizeInBytes: fileSizeInBytes,
 	}
@@ -698,12 +703,10 @@ func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error
 		return "", fmt.Errorf("Request sent, but Upload URL is empty (http-code:%d): %s", resp.StatusCode, body)
 	}
 
-	log.Printf("### getCacheUploadURL %s", time.Since(starttime))
 	return respModel.UploadURL, nil
 }
 
 func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
-	starttime := time.Now()
 	fi, err := os.Stat(archiveFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to get File Infos of Archive (%s): %s", archiveFilePath, err)
@@ -726,15 +729,11 @@ func uploadArchive(stepParams StepParamsModel, archiveFilePath string) error {
 		time.Sleep(3000 * time.Millisecond)
 		return _tryToUploadArchive(uploadURL, archiveFilePath)
 	}
-
-	log.Printf("### uploadArchive %s", time.Since(starttime))
 	return nil
 }
 
 func main() {
-
 	stepParams, err := CreateStepParamsFromEnvs()
-
 	if err != nil {
 		log.Fatalf(" [!] Input error : %s", err)
 	}
@@ -748,9 +747,7 @@ func main() {
 	for _, aPathItm := range stepParams.PathItems {
 		log.Printf(" * %s", aPathItm.Path)
 	}
-
 	stepParams.PathItems = cleanupCachePaths(stepParams.PathItems)
-
 	fmt.Println()
 	log.Println(colorstring.Green("=> (Filtered) Paths to cache:"))
 	for _, aPathItm := range stepParams.PathItems {
@@ -784,7 +781,6 @@ func main() {
 		if gIsDebugMode {
 			log.Printf("=> Loading Previous Cache Info from: %s", stepParams.CompareCacheInfoPath)
 		}
-
 		cacheInfo, err := readCacheInfoFromFile(stepParams.CompareCacheInfoPath)
 		if err != nil {
 			log.Printf(" "+colorstring.Red("[!] Failed to read Cache Info for compare")+": %s", err)
@@ -803,6 +799,7 @@ func main() {
 	//
 	// Fingerprint
 	//
+	startTime := time.Now()
 
 	fmt.Println()
 	log.Println(colorstring.Blue("=> Calculating Fingerprint ..."))
@@ -816,6 +813,7 @@ func main() {
 	}
 	fingerprintBase16Str := fmt.Sprintf("%x", pthsFingerprint)
 	log.Printf("=> Calculated Fingerprint (base 16): %s", fingerprintBase16Str)
+	log.Printf("=> Took: %s", time.Since(startTime))
 
 	if gIsDebugMode {
 		log.Printf("Comparing fingerprint with cache info from: %s", previousCacheInfo.Fingerprint)
@@ -836,10 +834,11 @@ func main() {
 	//
 	// Archive
 	//
+	startTime = time.Now()
 
 	fmt.Println()
 	log.Println(colorstring.Blue("=> Creating Archive ..."))
-	archiveFilePath, err := createCacheArchiveFromPaths(stepParams.PathItems, fingerprintBase16Str, fingerprintsMeta)
+	archiveFilePath, err := stepParams.createCacheArchiveFromPaths(stepParams.PathItems, fingerprintBase16Str, fingerprintsMeta)
 	if err != nil {
 		log.Fatalf(" [!] Failed to create Cache Archive: %s", err)
 	}
@@ -847,16 +846,19 @@ func main() {
 		log.Printf(" => archiveFilePath: %s", archiveFilePath)
 	}
 	log.Println(colorstring.Green("=> Creating Archive - DONE"))
+	log.Printf("=> Took: %s", time.Since(startTime))
 
 	//
 	// Upload
 	//
+	startTime = time.Now()
 	fmt.Println()
 	log.Println(colorstring.Blue("=> Uploading ..."))
 	if err := uploadArchive(stepParams, archiveFilePath); err != nil {
 		log.Fatalf(" [!] Failed to upload Cache Archive: %s", err)
 	}
 	log.Println(colorstring.Green("=> Upload - DONE"))
+	log.Printf("=> Took: %s", time.Since(startTime))
 
 	log.Println(colorstring.Green("=> FINISHED"))
 }
