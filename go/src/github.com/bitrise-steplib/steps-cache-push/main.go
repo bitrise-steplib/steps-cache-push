@@ -41,6 +41,11 @@ type StepParamsPathItemModel struct {
 	IndicatorFilePath string
 }
 
+// RedactedLog ...
+type RedactedLog struct {
+	counter int
+}
+
 // StepParamsModel ...
 type StepParamsModel struct {
 	PathItems            []StepParamsPathItemModel
@@ -68,6 +73,26 @@ type CacheInfosModel struct {
 	Fingerprint      string                          `json:"fingerprint"`
 	Contents         []CacheContentModel             `json:"cache_contents"`
 	FingerprintsMeta map[string]FingerprintMetaModel `json:"fingerprint_meta"`
+}
+
+// PrintfInc ...
+func (redactedLog *RedactedLog) PrintfInc(format string, v ...interface{}) {
+	if redactedLog.counter < 10 {
+		log.Printf(format, v)
+	}
+	if redactedLog.counter == 10 {
+		log.Printf("List truncated...")
+	}
+	if !gIsDebugMode {
+		redactedLog.counter++
+	}
+}
+
+// PrintfExc ...
+func (redactedLog *RedactedLog) PrintfExc(format string, v ...interface{}) {
+	if redactedLog.counter < 10 {
+		log.Printf(format, v)
+	}
 }
 
 func readCacheInfoFromFile(filePth string) (CacheInfosModel, error) {
@@ -383,19 +408,6 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 		return
 	}
 
-	logCount := 0
-	redactedPrintf := func(counts bool, format string, v ...interface{}) {
-		if logCount < 10 {
-			log.Printf(format, v)
-		}
-		if logCount == 10 {
-			log.Printf("List truncated...")
-		}
-		if counts && !gIsDebugMode {
-			logCount++
-		}
-	}
-
 	fmt.Println()
 	log.Println("=> Comparing cache meta information ...")
 
@@ -404,24 +416,26 @@ func compareFingerprintMetas(currentMeta, previousMeta map[string]FingerprintMet
 		prevItmsLookup[aPath] = true
 	}
 
+	redactedLog := &RedactedLog{}
+
 	for aPath, currValue := range currentMeta {
 		prevValue, isFound := previousMeta[aPath]
 		if !isFound {
-			redactedPrintf(true, "   [ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
+			redactedLog.PrintfInc("   [ADDED] (No value found in the Previous Cache Meta for path): %s", aPath)
 		} else {
 			delete(prevItmsLookup, aPath)
 			if currValue != prevValue {
-				redactedPrintf(true, " (i) File changed: %s", aPath)
-				redactedPrintf(false, "     Previous fingerprint (source): %s", prevValue)
-				redactedPrintf(false, "     Current  fingerprint (source): %s", currValue)
+				redactedLog.PrintfInc(" (i) File changed: %s", aPath)
+				redactedLog.PrintfExc("     Previous fingerprint (source): %s", prevValue)
+				redactedLog.PrintfExc("     Current  fingerprint (source): %s", currValue)
 			} else if gIsDebugMode {
-				redactedPrintf(false, " (i) File fingerprint (source) match: %s", aPath)
+				redactedLog.PrintfExc(" (i) File fingerprint (source) match: %s", aPath)
 			}
 		}
 	}
 
 	for aPath := range prevItmsLookup {
-		redactedPrintf(true, "   [REMOVED] (File (meta info about the file) is no longer in the cache, but it was in the previous one): %s", aPath)
+		redactedLog.PrintfInc("   [REMOVED] (File (meta info about the file) is no longer in the cache, but it was in the previous one): %s", aPath)
 	}
 
 	fmt.Println()
