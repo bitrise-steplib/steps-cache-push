@@ -133,7 +133,9 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
+	globalCacheDirs := os.Getenv("bitrise_cache_include_paths")
 	ignoreCheckOnPaths := os.Getenv("ignore_check_on_paths")
+	globalIgnoreCheckOnPaths := os.Getenv("bitrise_cache_exclude_paths")
 	cacheAPIURL := os.Getenv("cache_api_url")
 	fingerprintMethodID := os.Getenv("fingerprint_method")
 	compressArchive := os.Getenv("compress_archive")
@@ -164,7 +166,7 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 
 	// Cache Path Items
 	{
-		scanner := bufio.NewScanner(strings.NewReader(cacheDirs))
+		scanner := bufio.NewScanner(strings.NewReader(cacheDirs + "\n" + globalCacheDirs))
 		for scanner.Scan() {
 			aCachePathItemDef := scanner.Text()
 			aCachePathItemDef = strings.TrimSpace(aCachePathItemDef)
@@ -186,7 +188,7 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 
 	// Ignore Check on Paths items
 	{
-		scanner := bufio.NewScanner(strings.NewReader(ignoreCheckOnPaths))
+		scanner := bufio.NewScanner(strings.NewReader(ignoreCheckOnPaths + "\n" + globalIgnoreCheckOnPaths))
 		for scanner.Scan() {
 			aPthItmDef := scanner.Text()
 			aPthItmDef = strings.TrimSpace(aPthItmDef)
