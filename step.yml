@@ -134,6 +134,16 @@ inputs:
       value_options:
       - "true"
       - "false"
+  - compress_archive: "false"
+    opts:
+      title: "Compress cache?"
+      summary: "If compress cache set to `true`, then it will upload a compressed archive."
+      description: |-
+        If compress cache set to `true`, then it will upload a compressed archive.
+      is_required: true
+      value_options:
+      - "true"
+      - "false"
   - cache_api_url: $BITRISE_CACHE_API_URL
     opts:
       title: "TMP: Cache Upload URL"
