@@ -144,6 +144,18 @@ inputs:
       value_options:
       - "true"
       - "false"
+  - bitrise_cache_include_paths: $BITRISE_CACHE_INCLUDE_PATHS
+    opts:
+      title: "Cache paths collected runtime"
+      summary: "Collected dependencies by steps from the build"
+      is_required: true
+      is_dont_change_value: true
+  - bitrise_cache_exclude_paths: $BITRISE_CACHE_EXCLUDE_PATHS
+    opts:
+      title: "Ignore paths collected runtime"
+      summary: "Collected regularly changing files or extensions by steps from the build"
+      is_required: true
+      is_dont_change_value: true
   - cache_api_url: $BITRISE_CACHE_API_URL
     opts:
       title: "TMP: Cache Upload URL"
