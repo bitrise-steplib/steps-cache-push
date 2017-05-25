@@ -582,17 +582,17 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 	cacheArchiveFileName := "cache.tar.gz"
 	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
 
-	tarFlagsSlice := []string{"-c"}
+	tarFlagsSlice := "-c"
 
 	if gIsDebugMode {
-		tarFlagsSlice = append(tarFlagsSlice, "v")
+		tarFlagsSlice += "v"
 	}
 
 	if stepParams.CompressArchive {
-		tarFlagsSlice = append(tarFlagsSlice, "z")
+		tarFlagsSlice += "z"
 	}
 
-	tarCmdParams := append(tarFlagsSlice, "f", cacheArchiveFilePath, ".")
+	tarCmdParams := []string{tarFlagsSlice + "f", cacheArchiveFilePath, "."}
 	if gIsDebugMode {
 		log.Printf(" $ tar %s", tarCmdParams)
 	}
