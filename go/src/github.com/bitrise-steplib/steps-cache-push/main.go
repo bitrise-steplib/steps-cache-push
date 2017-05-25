@@ -582,17 +582,26 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 	cacheArchiveFileName := "cache.tar.gz"
 	cacheArchiveFilePath := filepath.Join(cacheArchiveTmpBaseDirPth, cacheArchiveFileName)
 
-	tarFlags := "-cvf"
-	if stepParams.CompressArchive {
-		tarFlags = "-cvzf"
+	tarFlagsSlice := []string{"-c"}
+
+	if gIsDebugMode {
+		tarFlagsSlice = append(tarFlagsSlice, "v")
 	}
 
-	tarCmdParams := []string{tarFlags, cacheArchiveFilePath, "."}
+	if stepParams.CompressArchive {
+		tarFlagsSlice = append(tarFlagsSlice, "z")
+	}
+
+	tarCmdParams := append(tarFlagsSlice, "f", cacheArchiveFilePath, ".")
 	if gIsDebugMode {
 		log.Printf(" $ tar %s", tarCmdParams)
 	}
 	if fullOut, err := cmdex.RunCommandInDirAndReturnCombinedStdoutAndStderr(cacheContentDirPath, "tar", tarCmdParams...); err != nil {
-		log.Printf(" [!] Failed to create cache archive, full output (stdout & stderr) was: %s", fullOut)
+		if !gIsDebugMode {
+			log.Printf(" [!] Failed to create cache archive, error: %s", fullOut)
+		} else {
+			log.Printf(" [!] Failed to create cache archive, full output (stdout & stderr) was: %s", fullOut)
+		}
 		return "", fmt.Errorf("Failed to create cache archive, error was: %s", err)
 	}
 
