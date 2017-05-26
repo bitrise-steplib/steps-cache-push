@@ -28,13 +28,7 @@ deps:
   - name: tar
 run_if: ".IsCI | and (not .IsPR)"
 inputs:
-  - cache_paths: |
-      $BITRISE_CACHE_DIR
-
-      ./Pods -> ./Podfile.lock
-
-      $HOME/.gradle
-      ./.gradle
+  - cache_paths:
     opts:
       title: "Cache paths"
       summary: Cache these paths. Separate paths with a newline.
@@ -51,12 +45,7 @@ inputs:
         this Step to fail. It'll be logged but the Step will try to gather
         as many specified & valid paths as it can, and just print warning
         about the invalid items.
-      is_required: true
-  - ignore_check_on_paths: |-
-      $HOME/.gradle/caches/*.lock
-      $HOME/.gradle/caches/*.bin
-      ./.gradle/*.lock
-      ./.gradle/*.bin
+  - ignore_check_on_paths:
     opts:
       title: "Ignore Paths from change check"
       summary: "Ignore these Paths when checking for cache changes"
