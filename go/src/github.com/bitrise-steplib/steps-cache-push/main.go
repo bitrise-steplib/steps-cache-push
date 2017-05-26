@@ -140,9 +140,6 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	fingerprintMethodID := os.Getenv("fingerprint_method")
 	compressArchive := os.Getenv("compress_archive")
 
-	if cacheDirs == "" {
-		return StepParamsModel{}, errors.New("No cache_paths input specified")
-	}
 	if cacheAPIURL == "" {
 		return StepParamsModel{}, errors.New("No cache_api_url input specified")
 	}
