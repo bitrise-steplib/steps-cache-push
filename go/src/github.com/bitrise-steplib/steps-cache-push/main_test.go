@@ -105,15 +105,6 @@ func Test_createCacheArchiveFromPaths(t *testing.T) {
 		StepParamsPathItemModel{Path: "./_sample_artifacts/filestructure"},
 	}
 	ignoreCheckOnPaths := []string{
-		"*.lock", //extension
-		"*.bin",
-		"**build**.json", //extension in sub-dir
-		"**build**.xml",
-		"**build**.properties",
-		"**build**/zip-cache/", //directory in a specified parent directory
-		"*.log",
-		"*.txt",
-		"*.rawproto",
 		"*.ap_",
 		"!*.apk",
 	}
