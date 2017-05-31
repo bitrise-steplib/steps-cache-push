@@ -564,7 +564,9 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 			RelativePathInArchive: itemRelPathInArchive,
 		})
 
-		archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--include", "*/")
+		if len(stepParams.IgnorePathsInArchive) > 0 {
+			archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--include", "*/")
+		}
 		for _, ignorePth := range stepParams.IgnorePathsInArchive {
 			archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--exclude", ignorePth)
 		}

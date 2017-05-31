@@ -54,13 +54,15 @@ inputs:
         If something changed under the specified path(s) and nothing else changed
         then the cache won't be updated.
 
-        **These paths are NOT ignored from the cache**, if a path is located
-        inside a specified Cache Path item it'll be included in the cache,
-        just won't be checked for changes.
+        **Paths are not prefixed with `!` will NOT ignored from the cache archive**,
+        if a path is located inside a specified Cache Path item and not prefixed with `!`,
+        it'll be included in the cache archive, just won't be checked for changes. 
 
-        The path can also include the `*` wildcard character, which will
-        do a **string** based compare (e.g. `a/*/b` will match `a/1/2/3/b` too,
-        not just `a/x/b`).
+        The path can also include `*`, `**`, `/`.
+        `*` will do path element replace (e.g. `a/*/b` will match `a/x/b`).
+        `**` will do path part replace (e.g. `a/**/b` will match `a/x/y/z/b`).
+        To exclude full directory like: `/my/full/path`, just simply put a `/` behind of it,
+        so it will be `/my/full/path/`.
 
         Important: you can't ignore a path which results in an invalid cache item.
         For example, if you specify the path `a/path/to/cache` to be cached, you
