@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	glob "github.com/ryanuber/go-glob"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,9 +95,52 @@ func Test_fingerprintSourceStringOfFile(t *testing.T) {
 		// file mod method
 		fingerprint, err = fingerprintSourceStringOfFile(sampleFilePth, fileInfo, fingerprintMethodIDFileModTime)
 		require.NoError(t, err)
-		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1493807561]"
+		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1496228936]"
 		require.Equal(t, expectedFingerprint, fingerprint)
 	}
+}
+
+func Test_createCacheArchiveFromPaths(t *testing.T) {
+	pathItems := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: "./_sample_artifacts/filestructure"},
+	}
+	ignoreCheckOnPaths := []string{
+		"*.lock", //extension
+		"*.bin",
+		"**build**.json", //extension in sub-dir
+		"**build**.xml",
+		"**build**.properties",
+		"**build**/zip-cache/", //directory in a specified parent directory
+		"*.log",
+		"*.txt",
+		"*.rawproto",
+		"*.ap_",
+		"*.apk",
+	}
+	stepParams := &StepParamsModel{
+		PathItems:          pathItems,
+		IgnoreCheckOnPaths: ignoreCheckOnPaths,
+	}
+
+	pthsFingerprint, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems, stepParams.IgnoreCheckOnPaths, "file-content-hash")
+	require.NoError(t, err)
+
+	fingerprintBase16Str := fmt.Sprintf("%x", pthsFingerprint)
+
+	archiveFilePath, err := stepParams.createCacheArchiveFromPaths(stepParams.PathItems, fingerprintBase16Str, fingerprintsMeta)
+	require.NoError(t, err)
+
+	errorMsg := ""
+	err = filepath.Walk(filepath.Join(filepath.Dir(archiveFilePath), "content"), func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
+		for _, ignorePattern := range stepParams.IgnoreCheckOnPaths {
+			if glob.Glob(ignorePattern, aPath) {
+				errorMsg += fmt.Sprintf("\n(pattern: %s) (path: %s)", ignorePattern, aPath)
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "", errorMsg, errorMsg)
 }
 
 func Test_isShouldIgnorePathFromFingerprint(t *testing.T) {

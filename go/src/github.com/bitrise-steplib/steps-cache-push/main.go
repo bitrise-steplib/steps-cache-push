@@ -562,6 +562,12 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 		if gIsDebugMode {
 			log.Printf(" $ rsync %s", archiveCopyRsyncParams)
 		}
+
+		archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--include", "*/")
+		for _, ignorePth := range stepParams.IgnoreCheckOnPaths {
+			archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--exclude", ignorePth)
+		}
+
 		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
 			log.Printf(" [!] Failed to sync archive target (%s), full output (stdout & stderr) was: %s", absItemPath, fullOut)
 			return "", fmt.Errorf("Failed to sync archive target (%s): %s", absItemPath, err)
