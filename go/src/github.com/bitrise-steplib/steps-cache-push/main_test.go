@@ -132,7 +132,7 @@ func Test_createCacheArchiveFromPaths(t *testing.T) {
 
 	errorMsg := ""
 	err = filepath.Walk(filepath.Join(filepath.Dir(archiveFilePath), "content"), func(aPath string, aFileInfo os.FileInfo, walkErr error) error {
-		for _, ignorePattern := range stepParams.IgnoreCheckOnPaths {
+		for _, ignorePattern := range stepParams.IgnorePathsInArchive {
 			if glob.Glob(ignorePattern, aPath) {
 				errorMsg += fmt.Sprintf("\n(pattern: %s) (path: %s)", ignorePattern, aPath)
 			}

@@ -50,6 +50,7 @@ type RedactedLog struct {
 type StepParamsModel struct {
 	PathItems            []StepParamsPathItemModel
 	IgnoreCheckOnPaths   []string
+	IgnorePathsInArchive []string
 	CacheAPIURL          string
 	CompareCacheInfoPath string
 	IsDebugMode          bool
@@ -191,6 +192,10 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 			aPthItmDef = strings.TrimSpace(aPthItmDef)
 			if aPthItmDef == "" {
 				continue
+			}
+			if strings.HasPrefix(aPthItmDef, "!") {
+				aPthItmDef = strings.TrimPrefix(aPthItmDef, "!")
+				stepParams.IgnorePathsInArchive = append(stepParams.IgnorePathsInArchive, aPthItmDef)
 			}
 
 			stepParams.IgnoreCheckOnPaths = append(stepParams.IgnoreCheckOnPaths, aPthItmDef)
@@ -560,7 +565,7 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 		})
 
 		archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--include", "*/")
-		for _, ignorePth := range stepParams.IgnoreCheckOnPaths {
+		for _, ignorePth := range stepParams.IgnorePathsInArchive {
 			archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--exclude", ignorePth)
 		}
 
