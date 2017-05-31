@@ -19,7 +19,9 @@ workflows:
             set -ex
             export GOPATH="$(pwd)/go"
             cd ./go/src/github.com/bitrise-steplib/steps-cache-push
-            go test ./...
+            rm -rf ./_sample_artifacts
+            git clone https://github.com/bitrise-samples/sample-artifacts.git ./_sample_artifacts
+            go test -v ./...
             # errcheck: https://github.com/kisielk/errcheck
             # Install: `go get -u github.com/kisielk/errcheck`
             #  and make sure your main $GOPATH/bin is in $PATH
