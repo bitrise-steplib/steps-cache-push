@@ -559,13 +559,13 @@ func (stepParams *StepParamsModel) createCacheArchiveFromPaths(pathItemsToCache 
 			RelativePathInArchive: itemRelPathInArchive,
 		})
 
-		if gIsDebugMode {
-			log.Printf(" $ rsync %s", archiveCopyRsyncParams)
-		}
-
 		archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--include", "*/")
 		for _, ignorePth := range stepParams.IgnoreCheckOnPaths {
 			archiveCopyRsyncParams = append(archiveCopyRsyncParams, "--exclude", ignorePth)
+		}
+
+		if gIsDebugMode {
+			log.Printf(" $ rsync %s", archiveCopyRsyncParams)
 		}
 
 		if fullOut, err := cmdex.RunCommandAndReturnCombinedStdoutAndStderr("rsync", archiveCopyRsyncParams...); err != nil {
