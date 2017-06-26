@@ -131,6 +131,36 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 	}, nil
 }
 
+func filterPaths(paths []StepParamsPathItemModel) ([]StepParamsPathItemModel, error) {
+	b := []StepParamsPathItemModel{}
+	for _, allpaths := range paths {
+		concs := 0
+		for _, path := range paths {
+			pth, err := filepath.Abs(path.Path)
+			if err != nil {
+				return nil, err
+			}
+			allPth, err := filepath.Abs(allpaths.Path)
+			if err != nil {
+				return nil, err
+			}
+			pth = strings.TrimSuffix(pth, "/")
+			allPth = strings.TrimSuffix(allPth, "/")
+			if pth == allPth {
+				if concs == 0 {
+					b = append(b, path)
+					concs++
+				}
+			} else if !strings.HasPrefix(pth, allPth) {
+				b = append(b, path)
+			}
+		}
+		paths = b
+		b = []StepParamsPathItemModel{}
+	}
+	return paths, nil
+}
+
 // CreateStepParamsFromEnvs ...
 func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 	cacheDirs := os.Getenv("cache_paths")
@@ -179,6 +209,14 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 
 			stepParams.PathItems = append(stepParams.PathItems, pthItm)
 		}
+
+		fPaths, err := filterPaths(stepParams.PathItems)
+		if err != nil {
+			return StepParamsModel{}, fmt.Errorf("Failed to filter cache_paths, error: %s", err)
+		}
+
+		stepParams.PathItems = fPaths
+
 		if err := scanner.Err(); err != nil {
 			return StepParamsModel{}, fmt.Errorf("Failed to scan the the cache_paths input: %s", err)
 		}

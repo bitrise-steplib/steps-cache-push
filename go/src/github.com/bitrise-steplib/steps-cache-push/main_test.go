@@ -95,7 +95,7 @@ func Test_fingerprintSourceStringOfFile(t *testing.T) {
 		// file mod method
 		fingerprint, err = fingerprintSourceStringOfFile(sampleFilePth, fileInfo, fingerprintMethodIDFileModTime)
 		require.NoError(t, err)
-		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1496228936]"
+		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1498475012]"
 		require.Equal(t, expectedFingerprint, fingerprint)
 	}
 }
