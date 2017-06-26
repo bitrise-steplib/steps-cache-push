@@ -24,6 +24,46 @@ func Test_sandbox(t *testing.T) {
 	}
 }
 
+func Test_filterPaths_lowest(t *testing.T) {
+	paths := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: "/test/path/sub1/sub3"},
+		StepParamsPathItemModel{Path: "/test/path"},
+		StepParamsPathItemModel{Path: "/test/path/sub1"},
+		StepParamsPathItemModel{Path: "/test/path/sub1/sub2"},
+	}
+
+	filteredPaths, err := filterPaths(paths)
+	require.NoError(t, err)
+
+	expectedPaths := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: "/test/path"},
+	}
+
+	require.Equal(t, expectedPaths, filteredPaths)
+}
+
+func Test_filterPaths_random(t *testing.T) {
+	paths := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: "/test/path"},
+		StepParamsPathItemModel{Path: "/test/path/sub1"},
+		StepParamsPathItemModel{Path: "/test/another/sub1"},
+		StepParamsPathItemModel{Path: "/test/another/sub1/sub2"},
+		StepParamsPathItemModel{Path: "/test/another/sub2"},
+		StepParamsPathItemModel{Path: "/test/path/sub1/sub2"},
+	}
+
+	filteredPaths, err := filterPaths(paths)
+	require.NoError(t, err)
+
+	expectedPaths := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: "/test/path"},
+		StepParamsPathItemModel{Path: "/test/another/sub1"},
+		StepParamsPathItemModel{Path: "/test/another/sub2"},
+	}
+
+	require.Equal(t, expectedPaths, filteredPaths)
+}
+
 func Test_parseStepParamsPathItemModelFromString(t *testing.T) {
 	// simple
 	{

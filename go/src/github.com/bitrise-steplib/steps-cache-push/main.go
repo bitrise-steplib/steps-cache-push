@@ -132,31 +132,31 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 }
 
 func filterPaths(paths []StepParamsPathItemModel) ([]StepParamsPathItemModel, error) {
-	b := []StepParamsPathItemModel{}
-	for _, allpaths := range paths {
-		concs := 0
-		for _, path := range paths {
-			pth, err := filepath.Abs(path.Path)
+	tmpPaths := []StepParamsPathItemModel{}
+	for _, pathToSearch := range paths {
+		alreadyAdded := false
+		for _, pathsList := range paths {
+			absPth, err := filepath.Abs(pathsList.Path)
 			if err != nil {
 				return nil, err
 			}
-			allPth, err := filepath.Abs(allpaths.Path)
+			absPthToSearch, err := filepath.Abs(pathToSearch.Path)
 			if err != nil {
 				return nil, err
 			}
-			pth = strings.TrimSuffix(pth, "/")
-			allPth = strings.TrimSuffix(allPth, "/")
-			if pth == allPth {
-				if concs == 0 {
-					b = append(b, path)
-					concs++
+			absPth = strings.TrimSuffix(absPth, "/")
+			absPthToSearch = strings.TrimSuffix(absPthToSearch, "/")
+			if absPth == absPthToSearch {
+				if !alreadyAdded {
+					tmpPaths = append(tmpPaths, pathsList)
+					alreadyAdded = true
 				}
-			} else if !strings.HasPrefix(pth, allPth) {
-				b = append(b, path)
+			} else if !strings.HasPrefix(absPth, absPthToSearch) {
+				tmpPaths = append(tmpPaths, pathsList)
 			}
 		}
-		paths = b
-		b = []StepParamsPathItemModel{}
+		paths = tmpPaths
+		tmpPaths = []StepParamsPathItemModel{}
 	}
 	return paths, nil
 }
