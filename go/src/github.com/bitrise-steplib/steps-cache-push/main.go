@@ -131,34 +131,34 @@ func parseStepParamsPathItemModelFromString(itmStr string) (StepParamsPathItemMo
 	}, nil
 }
 
-func filterPaths(paths []StepParamsPathItemModel) ([]StepParamsPathItemModel, error) {
+func flattenPathItems(pathItems []StepParamsPathItemModel) ([]StepParamsPathItemModel, error) {
 	tmpPaths := []StepParamsPathItemModel{}
-	for _, pathToSearch := range paths {
+	for _, referencePathItem := range pathItems {
 		alreadyAdded := false
-		for _, pathsList := range paths {
-			absPth, err := filepath.Abs(pathsList.Path)
+		for _, pathItemToCheck := range pathItems {
+			referencePath, err := filepath.Abs(pathItemToCheck.Path)
 			if err != nil {
 				return nil, err
 			}
-			absPthToSearch, err := filepath.Abs(pathToSearch.Path)
+			pathToCheck, err := filepath.Abs(referencePathItem.Path)
 			if err != nil {
 				return nil, err
 			}
-			absPth = strings.TrimSuffix(absPth, "/")
-			absPthToSearch = strings.TrimSuffix(absPthToSearch, "/")
-			if absPth == absPthToSearch {
+			referencePath = strings.TrimSuffix(referencePath, "/")
+			pathToCheck = strings.TrimSuffix(pathToCheck, "/")
+			if referencePath == pathToCheck {
 				if !alreadyAdded {
-					tmpPaths = append(tmpPaths, pathsList)
+					tmpPaths = append(tmpPaths, pathItemToCheck)
 					alreadyAdded = true
 				}
-			} else if !strings.HasPrefix(absPth, absPthToSearch) {
-				tmpPaths = append(tmpPaths, pathsList)
+			} else if !strings.HasPrefix(referencePath, pathToCheck) {
+				tmpPaths = append(tmpPaths, pathItemToCheck)
 			}
 		}
-		paths = tmpPaths
+		pathItems = tmpPaths
 		tmpPaths = []StepParamsPathItemModel{}
 	}
-	return paths, nil
+	return pathItems, nil
 }
 
 // CreateStepParamsFromEnvs ...
@@ -210,7 +210,7 @@ func CreateStepParamsFromEnvs() (StepParamsModel, error) {
 			stepParams.PathItems = append(stepParams.PathItems, pthItm)
 		}
 
-		fPaths, err := filterPaths(stepParams.PathItems)
+		fPaths, err := flattenPathItems(stepParams.PathItems)
 		if err != nil {
 			return StepParamsModel{}, fmt.Errorf("Failed to filter cache_paths, error: %s", err)
 		}

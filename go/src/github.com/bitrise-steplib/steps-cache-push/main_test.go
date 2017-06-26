@@ -24,7 +24,7 @@ func Test_sandbox(t *testing.T) {
 	}
 }
 
-func Test_filterPaths_lowest(t *testing.T) {
+func Test_filterPaths(t *testing.T) {
 	paths := []StepParamsPathItemModel{
 		StepParamsPathItemModel{Path: "/test/path/sub1/sub3"},
 		StepParamsPathItemModel{Path: "/test/path"},
@@ -32,7 +32,7 @@ func Test_filterPaths_lowest(t *testing.T) {
 		StepParamsPathItemModel{Path: "/test/path/sub1/sub2"},
 	}
 
-	filteredPaths, err := filterPaths(paths)
+	filteredPaths, err := flattenPathItems(paths)
 	require.NoError(t, err)
 
 	expectedPaths := []StepParamsPathItemModel{
@@ -52,7 +52,7 @@ func Test_filterPaths_random(t *testing.T) {
 		StepParamsPathItemModel{Path: "/test/path/sub1/sub2"},
 	}
 
-	filteredPaths, err := filterPaths(paths)
+	filteredPaths, err := flattenPathItems(paths)
 	require.NoError(t, err)
 
 	expectedPaths := []StepParamsPathItemModel{
