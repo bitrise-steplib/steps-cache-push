@@ -1,17 +1,15 @@
 #!/bin/bash
-
+set -ex
 THIS_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-set -e
+tmp_gopath_dir="$(mktemp -d)"
 
-export GO15VENDOREXPERIMENT="1"
-export GOPATH="${THIS_SCRIPT_DIR}/go"
+go_package_name="github.com/bitrise-steplib/steps-cache-push"
+full_package_path="${tmp_gopath_dir}/src/${go_package_name}"
+mkdir -p "${full_package_path}"
 
-if [ ! -z "$workdir" ] ; then
-  echo '$' cd "$workdir"
-  cd "$workdir"
-fi
+rsync -avh --quiet "${THIS_SCRIPT_DIR}/" "${full_package_path}/"
 
-echo
-go run "${THIS_SCRIPT_DIR}/go/src/github.com/bitrise-steplib/steps-cache-push/main.go"
-exit $?
+export GOPATH="${tmp_gopath_dir}"
+export GO15VENDOREXPERIMENT=1
+go run "${full_package_path}/main.go"

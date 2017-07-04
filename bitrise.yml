@@ -17,8 +17,6 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            export GOPATH="$(pwd)/go"
-            cd ./go/src/github.com/bitrise-steplib/steps-cache-push
             rm -rf ./_sample_artifacts
             git clone https://github.com/bitrise-samples/sample-artifacts.git ./_sample_artifacts
             go test -v ./...
@@ -61,16 +59,25 @@ workflows:
         - cache_api_url: $BITRISE_CACHE_API_URL
         - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
 
-  go-dep-update:
+# ----------------------------------------------------------------
+  # --- Utility workflows
+  godeps-update:
+    title: Godeps update
+    description: |
+      Used for updating bitrise dependencies with godep
     steps:
     - script:
+        title: Dependency update
         inputs:
-        - content: |-
+        - content: |
             #!/bin/bash
             set -ex
-            export GOPATH="$(pwd)/go"
-            cd ./go/src/github.com/bitrise-steplib/steps-cache-push
-            go get ./...
+            go get -u -v github.com/tools/godep
+            go get github.com/davecgh/go-spew/spew
+            go get github.com/pmezard/go-difflib/difflib
+            rm -rf ./Godeps
+            rm -rf ./vendor
+            go get -t -d ./...
             godep save ./...
 
   # ----------------------------------------------------------------
