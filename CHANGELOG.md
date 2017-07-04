@@ -1,6 +1,10 @@
-## Changelog (Current version: 1.1.2)
+## Changelog (Current version: 1.1.3)
 
 -----------------
+
+### 1.1.3 (2017 Jul 04)
+
+* [4895f5d] Preapre for 1.1.3
 
 ### 1.1.2 (2017 Jul 04)
 
