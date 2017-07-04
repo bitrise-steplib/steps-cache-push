@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bitrise-io/go-utils/fileutil"
+	"github.com/bitrise-io/go-utils/pathutil"
 	glob "github.com/ryanuber/go-glob"
 	"github.com/stretchr/testify/require"
 )
@@ -138,6 +140,39 @@ func Test_fingerprintSourceStringOfFile(t *testing.T) {
 		expectedFingerprint = "[./_samples/simple_text_file.txt]-[26B]-[0x644]-[@1498475012]"
 		require.Equal(t, expectedFingerprint, fingerprint)
 	}
+}
+
+func Test_createCacheArchiveFromPathsAllIgnored(t *testing.T) {
+
+	pth1, err := pathutil.NormalizedOSTempDirPath("pth1")
+	require.NoError(t, err)
+	pth2, err := pathutil.NormalizedOSTempDirPath("pth2")
+	require.NoError(t, err)
+
+	pth1 = filepath.Join(pth1, "tmpfile.txt")
+	pth2 = filepath.Join(pth2, "tmpfile.txt")
+
+	require.NoError(t, fileutil.WriteStringToFile(pth1, "."))
+	require.NoError(t, fileutil.WriteStringToFile(pth2, "."))
+
+	pathItems := []StepParamsPathItemModel{
+		StepParamsPathItemModel{Path: filepath.Dir(pth1)},
+		StepParamsPathItemModel{Path: filepath.Dir(pth2)},
+	}
+	ignoreCheckOnPaths := []string{
+		pth1,
+		pth2,
+	}
+	stepParams := &StepParamsModel{
+		PathItems:          pathItems,
+		IgnoreCheckOnPaths: ignoreCheckOnPaths,
+	}
+
+	_, fingerprintsMeta, err := fingerprintOfPaths(stepParams.PathItems, stepParams.IgnoreCheckOnPaths, "file-content-hash")
+	require.NoError(t, err)
+
+	require.Equal(t, "-", fingerprintsMeta[pth1].FingerprintSource)
+	require.Equal(t, "-", fingerprintsMeta[pth2].FingerprintSource)
 }
 
 func Test_createCacheArchiveFromPaths(t *testing.T) {

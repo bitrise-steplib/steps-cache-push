@@ -374,6 +374,8 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 					if gIsDebugMode {
 						log.Printf(" [IGNORE] path from fingerprint: %s", aPath)
 					}
+					fingerprintMeta[aPath] = FingerprintMetaModel{FingerprintSource: "-"}
+					isFingerprintGeneratedForPathItem = true
 					return nil
 				}
 
@@ -401,6 +403,8 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 		} else {
 			if isShouldIgnorePathFromFingerprint(fingerprintSourceAbsPth, absIgnorePaths) {
 				log.Printf(" [IGNORE] path from fingerprint: %s", fingerprintSourceAbsPth)
+				fingerprintMeta[fingerprintSourceAbsPth] = FingerprintMetaModel{FingerprintSource: "-"}
+				isFingerprintGeneratedForPathItem = true
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
 					theFingerprintSourcePath)
 			}
