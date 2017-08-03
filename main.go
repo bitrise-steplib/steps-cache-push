@@ -405,29 +405,32 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 				log.Printf(" [IGNORE] path from fingerprint: %s", fingerprintSourceAbsPth)
 				fingerprintMeta[fingerprintSourceAbsPth] = FingerprintMetaModel{FingerprintSource: "-"}
 				isFingerprintGeneratedForPathItem = true
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
-					theFingerprintSourcePath)
+
+				//return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
+				//	theFingerprintSourcePath)
 			}
 
-			if isIndicatorFile {
-				// for indicator files always use content checksum fingerprint
-				fingerprintMethodID = fingerprintMethodIDContentChecksum
-			}
-			fileFingerprintSource, err := fingerprintSourceStringOfFile(fingerprintSourceAbsPth, fileInfo, fingerprintMethodID)
-			if err != nil {
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", theFingerprintSourcePath, err)
-			}
+			if !isFingerprintGeneratedForPathItem {
+				if isIndicatorFile {
+					// for indicator files always use content checksum fingerprint
+					fingerprintMethodID = fingerprintMethodIDContentChecksum
+				}
+				fileFingerprintSource, err := fingerprintSourceStringOfFile(fingerprintSourceAbsPth, fileInfo, fingerprintMethodID)
+				if err != nil {
+					return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint source for file (%s), error: %s", theFingerprintSourcePath, err)
+				}
 
-			if gIsDebugMode {
-				log.Printf(" -> fileFingerprintSource (%s): %#v", theFingerprintSourcePath, fileFingerprintSource)
-			}
-			fingerprintMeta[theFingerprintSourcePath] = FingerprintMetaModel{FingerprintSource: fileFingerprintSource}
+				if gIsDebugMode {
+					log.Printf(" -> fileFingerprintSource (%s): %#v", theFingerprintSourcePath, fileFingerprintSource)
+				}
+				fingerprintMeta[theFingerprintSourcePath] = FingerprintMetaModel{FingerprintSource: fileFingerprintSource}
 
-			if _, err := io.WriteString(fingerprintHash, fileFingerprintSource); err != nil {
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
-					fileFingerprintSource, err)
+				if _, err := io.WriteString(fingerprintHash, fileFingerprintSource); err != nil {
+					return []byte{}, fingerprintMeta, fmt.Errorf("Failed to write fingerprint source string (%s) to fingerprint hash: %s",
+						fileFingerprintSource, err)
+				}
+				isFingerprintGeneratedForPathItem = true
 			}
-			isFingerprintGeneratedForPathItem = true
 		}
 
 		if isFingerprintGeneratedForPathItem {
