@@ -1,6 +1,11 @@
-## Changelog (Current version: 1.1.3)
+## Changelog (Current version: 1.1.4)
 
 -----------------
+
+### 1.1.4 (2017 Aug 04)
+
+* [43d5ac3] Prepare for 1.1.4
+* [d38e002] Fix error on giving in a file to cache and also ignored (#10)
 
 ### 1.1.3 (2017 Jul 04)
 
@@ -65,4 +70,4 @@
 
 -----------------
 
-Updated: 2017 Jul 04
+Updated: 2017 Aug 04
