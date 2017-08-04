@@ -401,16 +401,6 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to walk through the specified directory (%s): %s", theFingerprintSourcePath, err)
 			}
 		} else {
-			if isShouldIgnorePathFromFingerprint(fingerprintSourceAbsPth, absIgnorePaths) && !isIndicatorFile {
-				log.Printf(" [IGNORE] path from fingerprint: %s", fingerprintSourceAbsPth)
-				//fingerprintMeta[fingerprintSourceAbsPth] = FingerprintMetaModel{FingerprintSource: "-"}
-				//isFingerprintGeneratedForPathItem = true
-
-				return []byte{}, fingerprintMeta, fmt.Errorf("Failed to generate fingerprint for path - no file found to generate one: %s",
-					theFingerprintSourcePath)
-			}
-
-			//if !isFingerprintGeneratedForPathItem {
 			if isIndicatorFile {
 				// for indicator files always use content checksum fingerprint
 				fingerprintMethodID = fingerprintMethodIDContentChecksum
@@ -430,7 +420,6 @@ func fingerprintOfPaths(pathItms []StepParamsPathItemModel, ignorePaths []string
 					fileFingerprintSource, err)
 			}
 			isFingerprintGeneratedForPathItem = true
-			//}
 		}
 
 		if isFingerprintGeneratedForPathItem {
