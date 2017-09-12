@@ -149,12 +149,13 @@ func (cacheModel *CacheModel) CreateTarArchive() error {
 		if err != nil {
 			return err
 		}
-		defer gw.Close()
+
 		cacheModel.TarWriter = tar.NewWriter(gw)
 		cacheModel.GzipWriter = gw
 	} else {
 		cacheModel.TarWriter = tar.NewWriter(tarFile)
 	}
+
 	cacheModel.TarFile = tarFile
 
 	return nil
