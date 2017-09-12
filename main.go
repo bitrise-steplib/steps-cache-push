@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -80,9 +81,11 @@ type CacheModel struct {
 	PreviousFilePathMap map[string]string
 	IndicatorHashMap    map[string]string
 	TarWriter           *tar.Writer
+	GzipWriter          *gzip.Writer
 	TarFile             *os.File
 	DebugMode           bool
 	FileChangeIndicator ChangeIndicator
+	CompressArchive     bool
 }
 
 // ConfigsModel ...
@@ -93,10 +96,8 @@ type ConfigsModel struct {
 	GlobalCacheIgnoreList string
 	DebugMode             string
 	CacheAPIURL           string
-
-	// TODO
-	FingerprintMethodID string
-	CompressArchive     string
+	FingerprintMethodID   string
+	CompressArchive       string
 }
 
 func (configs *ConfigsModel) print() {
@@ -114,9 +115,8 @@ func createConfigsModelFromEnvs() *ConfigsModel {
 		GlobalCacheIgnoreList: os.Getenv("bitrise_cache_exclude_paths"),
 		DebugMode:             os.Getenv("is_debug_mode"),
 		CacheAPIURL:           os.Getenv("cache_api_url"),
-		// TODO
-		FingerprintMethodID: os.Getenv("fingerprint_method"),
-		CompressArchive:     os.Getenv("compress_archive"),
+		FingerprintMethodID:   os.Getenv("fingerprint_method"),
+		CompressArchive:       os.Getenv("compress_archive"),
 	}
 }
 
@@ -133,6 +133,7 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 		PreviousFilePathMap: map[string]string{},
 		DebugMode:           configs.DebugMode == "true",
 		FileChangeIndicator: ChangeIndicator(configs.FingerprintMethodID),
+		CompressArchive:     configs.CompressArchive == "true",
 	}
 }
 
@@ -143,8 +144,16 @@ func (cacheModel *CacheModel) CreateTarArchive() error {
 		return err
 	}
 
+	if cacheModel.CompressArchive {
+		gw := gzip.NewWriter(tarFile)
+		defer gw.Close()
+		cacheModel.TarWriter = tar.NewWriter(gw)
+		cacheModel.GzipWriter = gw
+	} else {
+		cacheModel.TarWriter = tar.NewWriter(tarFile)
+	}
 	cacheModel.TarFile = tarFile
-	cacheModel.TarWriter = tar.NewWriter(tarFile)
+
 	return nil
 }
 
@@ -175,6 +184,12 @@ func (cacheModel *CacheModel) CloseTarArchive() error {
 
 	if err := cacheModel.TarWriter.Close(); err != nil {
 		return err
+	}
+
+	if cacheModel.CompressArchive {
+		if err := cacheModel.GzipWriter.Close(); err != nil {
+			return err
+		}
 	}
 
 	if err := cacheModel.TarFile.Close(); err != nil {
