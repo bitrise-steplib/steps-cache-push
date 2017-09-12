@@ -459,6 +459,8 @@ func (cacheModel *CacheModel) CleanPaths() error {
 }
 
 func main() {
+	stepStartedAt := time.Now()
+
 	log.Infof("Configs:")
 	configs := createConfigsModelFromEnvs()
 	configs.print()
@@ -467,15 +469,18 @@ func main() {
 
 	cacheModel := NewCacheModel(configs)
 
+	startTime := time.Now()
 	log.Infof("Cleaning paths")
 	if err := cacheModel.CleanPaths(); err != nil {
 		log.Errorf("Failed to clean paths, error: %+v", err)
 		os.Exit(1)
 	}
 	log.Printf("- Done")
+	log.Printf("- Took: %s", time.Now().Sub(startTime))
 
 	fmt.Println()
 
+	startTime = time.Now()
 	log.Infof("Checking previous cache status")
 	cacheInfoFileExists, err := cacheModel.LoadPreviousFilePathMap()
 	if err != nil {
@@ -484,14 +489,17 @@ func main() {
 	}
 
 	if cacheInfoFileExists {
-		log.Printf("- Cache info file found")
+		log.Printf("- Previous cache info found")
 	} else {
 		log.Printf("- No previous cache info found")
 	}
+	log.Printf("- Done")
+	log.Printf("- Took: %s", time.Now().Sub(startTime))
 
 	recacheRequired := true
 	if cacheInfoFileExists {
 		fmt.Println()
+		startTime = time.Now()
 		log.Infof("Checking for file changes")
 		currentFilePathsMap, err := cacheModel.GenerateCacheInfoMAP()
 		if err != nil {
@@ -504,15 +512,23 @@ func main() {
 			log.Errorf("Failed to compare file path maps, error: %+v", err)
 			os.Exit(1)
 		}
+
+		if recacheRequired {
+			log.Printf("- File changes found")
+			log.Printf("- Done")
+			log.Printf("- Took: %s", time.Now().Sub(startTime))
+			fmt.Println()
+		} else {
+			log.Printf("- No files changed")
+			log.Printf("- Done")
+			log.Printf("- Took: %s", time.Now().Sub(startTime))
+			fmt.Println()
+			log.Printf("Total time: %s", time.Now().Sub(stepStartedAt))
+			os.Exit(0)
+		}
 	}
 
-	if !recacheRequired {
-		log.Printf("- No files changed, done")
-		os.Exit(0)
-	}
-
-	log.Printf("- File changes found")
-	fmt.Println()
+	startTime = time.Now()
 	log.Infof("Generating cache archive")
 	if err := cacheModel.CreateTarArchive(); err != nil {
 		log.Errorf("Failed to create tar archive, error: %+v", err)
@@ -529,14 +545,21 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("- Done")
+	log.Printf("- Took: %s", time.Now().Sub(startTime))
 
 	fmt.Println()
 
+	startTime = time.Now()
 	log.Infof("Uploading cache archive")
 	if err := configs.uploadArchive(); err != nil {
 		log.Errorf("Failed to upload archive, error: %+v", err)
 		os.Exit(1)
 	}
+	log.Printf("- Done")
+	log.Printf("- Took: %s", time.Now().Sub(startTime))
+
+	fmt.Println()
+	log.Printf("Total time: %s", time.Now().Sub(stepStartedAt))
 }
 
 func (configs *ConfigsModel) uploadArchive() error {
