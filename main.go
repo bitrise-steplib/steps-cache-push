@@ -145,7 +145,10 @@ func (cacheModel *CacheModel) CreateTarArchive() error {
 	}
 
 	if cacheModel.CompressArchive {
-		gw := gzip.NewWriter(tarFile)
+		gw, err := gzip.NewWriterLevel(tarFile, gzip.BestCompression)
+		if err != nil {
+			return err
+		}
 		defer gw.Close()
 		cacheModel.TarWriter = tar.NewWriter(gw)
 		cacheModel.GzipWriter = gw
