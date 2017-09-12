@@ -33,20 +33,19 @@ const (
 	fileIndicatorSeparator = "->"
 	cacheArchivePath       = "/tmp/cache-archive.tar"
 	cacheInfoFilePath      = "/tmp/cache-info.json"
+
+	fingerprintMethodIDContentChecksum = "file-content-hash"
+	fingerprintMethodIDFileModTime     = "file-mod-time"
 )
 
-// ChangeMode ...
-type ChangeMode int
+// ChangeIndicator ...
+type ChangeIndicator string
 
 const (
-	// CHANGED ...
-	CHANGED = ChangeMode(0)
-	// REMOVED ...
-	REMOVED = ChangeMode(1)
-	// ADDED ...
-	ADDED = ChangeMode(2)
-	// NOCHANGE ...
-	NOCHANGE = ChangeMode(3)
+	// MD5 ...
+	MD5 = ChangeIndicator(fingerprintMethodIDContentChecksum)
+	// MODTIME ...
+	MODTIME = ChangeIndicator(fingerprintMethodIDFileModTime)
 )
 
 // StoreMode ...
@@ -83,6 +82,7 @@ type CacheModel struct {
 	TarWriter           *tar.Writer
 	TarFile             *os.File
 	DebugMode           bool
+	FileChangeIndicator ChangeIndicator
 }
 
 // ConfigsModel ...
@@ -132,6 +132,7 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 		IndicatorHashMap:    map[string]string{},
 		PreviousFilePathMap: map[string]string{},
 		DebugMode:           configs.DebugMode == "true",
+		FileChangeIndicator: ChangeIndicator(configs.FingerprintMethodID),
 	}
 }
 
@@ -222,11 +223,15 @@ func (cacheModel *CacheModel) GenerateCacheInfoMAP() (map[string]string, error) 
 			if header.Typeflag == tar.TypeReg {
 				switch storeMode {
 				case STORE:
-					fileMD5, err := getFileContentMD5(path)
-					if err != nil {
-						return err
+					if cacheModel.FileChangeIndicator == MD5 {
+						fileMD5, err := getFileContentMD5(path)
+						if err != nil {
+							return err
+						}
+						filePathMap[path] = fileMD5
+					} else if cacheModel.FileChangeIndicator == MODTIME {
+						filePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
 					}
-					filePathMap[path] = fileMD5
 				case SKIP:
 					filePathMap[path] = "-"
 				case INDICATOR:
@@ -290,11 +295,15 @@ func (cacheModel *CacheModel) ProcessFiles() error {
 			if header.Typeflag == tar.TypeReg {
 				switch storeMode {
 				case STORE:
-					fileMD5, err := getFileContentMD5(path)
-					if err != nil {
-						return err
+					if cacheModel.FileChangeIndicator == MD5 {
+						fileMD5, err := getFileContentMD5(path)
+						if err != nil {
+							return err
+						}
+						cacheModel.FilePathMap[path] = fileMD5
+					} else if cacheModel.FileChangeIndicator == MODTIME {
+						cacheModel.FilePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
 					}
-					cacheModel.FilePathMap[path] = fileMD5
 				case SKIP:
 					cacheModel.FilePathMap[path] = "-"
 				case INDICATOR:
@@ -442,13 +451,24 @@ func (cacheModel *CacheModel) CleanPaths() error {
 			splittedPath := strings.Split(path, fileIndicatorSeparator)
 			cleanPath := strings.TrimSpace(splittedPath[0])
 
-			indicatorFileMD5, err := getFileContentMD5(strings.TrimSpace(splittedPath[1]))
-			if err != nil {
-				return err
+			indicatorFileChangeIndicator := ""
+			var err error
+
+			if cacheModel.FileChangeIndicator == MD5 {
+				indicatorFileChangeIndicator, err = getFileContentMD5(strings.TrimSpace(splittedPath[1]))
+				if err != nil {
+					return err
+				}
+			} else if cacheModel.FileChangeIndicator == MODTIME {
+				fi, err := os.Stat(strings.TrimSpace(splittedPath[1]))
+				if err != nil {
+					return err
+				}
+				indicatorFileChangeIndicator = fmt.Sprintf("%d", fi.ModTime().Unix())
 			}
 
 			cleanedPathList = append(cleanedPathList, cleanPath)
-			cacheModel.IndicatorHashMap[cleanPath] = indicatorFileMD5
+			cacheModel.IndicatorHashMap[cleanPath] = indicatorFileChangeIndicator
 		} else {
 			cleanedPathList = append(cleanedPathList, strings.TrimSpace(path))
 		}
