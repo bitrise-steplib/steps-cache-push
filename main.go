@@ -17,26 +17,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bitrise-io/go-utils/fileutil"
-
 	"github.com/bitrise-io/depman/pathutil"
+	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	glob "github.com/ryanuber/go-glob"
 )
 
 const (
-	// testing
-	testDebugMode = "false"
-	testPaths     = `/Users/tamaspapik/Downloads/23953/c-1`
-	testIgnores   = `*.h
-*.m`
-
-	fileIndicatorSeparator = "->"
-	cacheArchivePath       = "/tmp/cache-archive.tar"
-	cacheInfoFilePath      = "/tmp/cache-info.json"
-
-	fingerprintMethodIDContentChecksum = "file-content-hash"
+	fileIndicatorSeparator             = "->"
 	fingerprintMethodIDFileModTime     = "file-mod-time"
+	fingerprintMethodIDContentChecksum = "file-content-hash"
+	cacheInfoFilePath                  = "/tmp/cache-info.json"
+	cacheArchivePath                   = "/tmp/cache-archive.tar"
 )
 
 // ChangeIndicator ...
@@ -75,17 +67,17 @@ type GenerateUploadURLRespModel struct {
 
 // CacheModel ...
 type CacheModel struct {
+	DebugMode           bool
+	CompressArchive     bool
 	PathList            []string
 	IgnoreList          []string
+	TarFile             *os.File
+	TarWriter           *tar.Writer
+	GzipWriter          *gzip.Writer
+	FileChangeIndicator ChangeIndicator
 	FilePathMap         map[string]string
 	PreviousFilePathMap map[string]string
 	IndicatorHashMap    map[string]string
-	TarWriter           *tar.Writer
-	GzipWriter          *gzip.Writer
-	TarFile             *os.File
-	DebugMode           bool
-	FileChangeIndicator ChangeIndicator
-	CompressArchive     bool
 }
 
 // ConfigsModel ...
@@ -110,13 +102,13 @@ func (configs *ConfigsModel) print() {
 func createConfigsModelFromEnvs() *ConfigsModel {
 	return &ConfigsModel{
 		Paths:                 os.Getenv("cache_paths"),
+		DebugMode:             os.Getenv("is_debug_mode"),
+		CacheAPIURL:           os.Getenv("cache_api_url"),
+		CompressArchive:       os.Getenv("compress_archive"),
+		FingerprintMethodID:   os.Getenv("fingerprint_method"),
 		IgnoredPaths:          os.Getenv("ignore_check_on_paths"),
 		GlobalCachePathList:   os.Getenv("bitrise_cache_include_paths"),
 		GlobalCacheIgnoreList: os.Getenv("bitrise_cache_exclude_paths"),
-		DebugMode:             os.Getenv("is_debug_mode"),
-		CacheAPIURL:           os.Getenv("cache_api_url"),
-		FingerprintMethodID:   os.Getenv("fingerprint_method"),
-		CompressArchive:       os.Getenv("compress_archive"),
 	}
 }
 
@@ -127,13 +119,13 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 
 	return &CacheModel{
 		PathList:            splittedPaths,
-		IgnoreList:          splittedIgnoredPaths,
 		FilePathMap:         map[string]string{},
 		IndicatorHashMap:    map[string]string{},
 		PreviousFilePathMap: map[string]string{},
+		IgnoreList:          splittedIgnoredPaths,
 		DebugMode:           configs.DebugMode == "true",
-		FileChangeIndicator: ChangeIndicator(configs.FingerprintMethodID),
 		CompressArchive:     configs.CompressArchive == "true",
+		FileChangeIndicator: ChangeIndicator(configs.FingerprintMethodID),
 	}
 }
 
@@ -150,14 +142,13 @@ func (cacheModel *CacheModel) CreateTarArchive() error {
 			return err
 		}
 
-		cacheModel.TarWriter = tar.NewWriter(gw)
 		cacheModel.GzipWriter = gw
+		cacheModel.TarWriter = tar.NewWriter(gw)
 	} else {
 		cacheModel.TarWriter = tar.NewWriter(tarFile)
 	}
 
 	cacheModel.TarFile = tarFile
-
 	return nil
 }
 
@@ -267,9 +258,7 @@ func (cacheModel *CacheModel) GenerateCacheInfoMAP() (map[string]string, error) 
 
 // ProcessFiles ...
 func (cacheModel *CacheModel) ProcessFiles() error {
-
 	for _, cachePath := range cacheModel.PathList {
-
 		if err := filepath.Walk(cachePath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -493,7 +482,6 @@ func (cacheModel *CacheModel) CleanPaths() error {
 		}
 	}
 	cacheModel.PathList = cleanedPathList
-
 	return nil
 }
 
