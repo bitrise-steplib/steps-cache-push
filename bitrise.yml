@@ -49,6 +49,91 @@ workflows:
         - ignore_check_on_paths: |-
             ../_sample_artifacts/filestructure/sub-dir
             *.apk
+    - script:
+        title: Create another samples
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            rm -rf /tmp/cache-archive.tar
+            rm -rf /tmp/cache-info.json
+            rm -rf ./another_samples
+            mkdir ./another_samples
+
+            #should follow changes
+            echo "content" > ./another_samples/test_file1.txt
+
+            #should not exists
+            echo "content" > ./another_samples/test_exclude_ext.mp3
+
+            #should exists but ignore changes
+            echo "content" > ./another_samples/test_ignorechanges.txt
+    - path::./:
+        title: Step Test
+        is_always_run: true
+        run_if: true
+        is_skippable: false
+        inputs:
+        - is_debug_mode: true
+        - cache_paths: |
+            ./another_samples
+        - ignore_check_on_paths: |-
+            ./another_samples/test_ignorechanges.txt
+            !*.mp3
+    - script:
+        title: Store MD5 hash and check if file doesn't exists
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            
+            rm -rf ./another_samples
+            tar -xPf /tmp/cache-archive.tar
+
+            envman add --key MD5PREVIOUSLY --value $(md5 -q ./another_samples/test_ignorechanges.txt)
+            echo "content" >> ./another_samples/test_ignorechanges.txt
+
+            #should not exists
+            if [ -f ./another_samples/test_exclude_ext.mp3 ]; then
+              echo "File exists."
+              exit 1
+            fi
+    - path::./:
+        title: Step Test
+        is_always_run: true
+        run_if: true
+        is_skippable: false
+        inputs:
+        - is_debug_mode: true
+        - cache_paths: |
+            ./another_samples
+        - ignore_check_on_paths: |-
+            ./another_samples/test_ignorechanges.txt
+            !*.mp3
+    - script:
+        title: Check if MD5 matches the previous one
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            
+            rm -rf ./another_samples
+            tar -xPf /tmp/cache-archive.tar
+
+            export MD5CURRENT=$(md5 -q ./another_samples/test_ignorechanges.txt)
+            if [ "$MD5CURRENT" != "$MD5PREVIOUSLY" ]; then
+              echo "MD5 changed."
+              exit 1
+            fi
+
+            #should not exists
+            if [ -f ./another_samples/test_exclude_ext.mp3 ]; then
+              echo "File exists."
+              exit 1
+            fi
 
   go-tests:
     before_run:

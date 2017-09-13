@@ -235,17 +235,12 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return nil
 			}
 
-			absPath, err := filepath.Abs(path)
+			header, err := tar.FileInfoHeader(info, path)
 			if err != nil {
 				return err
 			}
 
-			header, err := tar.FileInfoHeader(info, absPath)
-			if err != nil {
-				return err
-			}
-
-			header.Name = absPath
+			header.Name = path
 
 			if info.IsDir() {
 				header.Name += "/"
@@ -470,6 +465,16 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				continue
 			}
 
+			cleanPath, err = filepath.Abs(cleanPath)
+			if err != nil {
+				return err
+			}
+
+			indicatorFilePath, err = filepath.Abs(indicatorFilePath)
+			if err != nil {
+				return err
+			}
+
 			indicatorFileChangeIndicator := ""
 
 			if cacheModel.FileChangeIndicator == MD5 {
@@ -499,6 +504,11 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				continue
 			}
 
+			path, err = filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+
 			cleanedPathList = append(cleanedPathList, path)
 		}
 	}
@@ -509,6 +519,14 @@ func (cacheModel *CacheModel) CleanPaths() error {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
+		}
+
+		if !strings.Contains(path, "*") {
+			var err error
+			path, err = filepath.Abs(path)
+			if err != nil {
+				return err
+			}
 		}
 
 		cleanedIgnoredPathList = append(cleanedIgnoredPathList, path)
