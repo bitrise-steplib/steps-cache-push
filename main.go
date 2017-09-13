@@ -241,6 +241,7 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 			}
 
 			header.Name = path
+			header.ModTime = info.ModTime()
 
 			if info.IsDir() {
 				header.Name += "/"
@@ -256,16 +257,6 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 			}
 
 			if archiveFiles {
-				if header.Typeflag == tar.TypeReg {
-					// fStat, ok := info.Sys().(*syscall.Stat_t)
-					// if ok {
-					// 	header.AccessTime = timespecToTime(fStat.Atimespec)
-					// 	header.ModTime = timespecToTime(fStat.Mtimespec)
-					// 	header.ChangeTime = timespecToTime(fStat.Ctimespec)
-					// 	header.Mode = int64(fStat.Mode)
-					// }
-				}
-
 				if err := cacheModel.TarWriter.WriteHeader(header); err != nil {
 					return err
 				}
