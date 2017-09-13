@@ -262,6 +262,7 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 						header.AccessTime = timespecToTime(fStat.Atimespec)
 						header.ModTime = timespecToTime(fStat.Mtimespec)
 						header.ChangeTime = timespecToTime(fStat.Ctimespec)
+						header.Mode = int64(fStat.Mode)
 					}
 				}
 
