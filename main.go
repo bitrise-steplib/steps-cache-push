@@ -393,8 +393,8 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 						return true, nil
 					}
 				}
-				logLineCount++
 			}
+			logLineCount++
 		} else {
 			if currentValue != prevValue {
 				log.Warnf("CHANGED: %s, Current: %s != Previous: %s", prevKey, currentValue, prevValue)
@@ -424,8 +424,8 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 					return true, nil
 				}
 			}
-			logLineCount++
 		}
+		logLineCount++
 	}
 
 	return triggerNewCache, nil
