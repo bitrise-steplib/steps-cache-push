@@ -97,7 +97,7 @@ func (configs *ConfigsModel) print() {
 		if clnPth == "" {
 			continue
 		}
-		log.Printf("  *%s", clnPth)
+		log.Printf("  * %s", clnPth)
 	}
 
 	log.Printf("- IgnoredPaths:")
@@ -106,7 +106,7 @@ func (configs *ConfigsModel) print() {
 		if clnPth == "" {
 			continue
 		}
-		log.Printf("  *%s", clnPth)
+		log.Printf("  * %s", clnPth)
 	}
 
 	log.Printf("- CompressArchive: %s", configs.CompressArchive)
@@ -235,12 +235,17 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return nil
 			}
 
-			header, err := tar.FileInfoHeader(info, path)
+			absPath, err := filepath.Abs(path)
 			if err != nil {
 				return err
 			}
 
-			header.Name = path
+			header, err := tar.FileInfoHeader(info, absPath)
+			if err != nil {
+				return err
+			}
+
+			header.Name = absPath
 
 			if info.IsDir() {
 				header.Name += "/"
@@ -249,15 +254,20 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 			storeMode, indicatorFileMD5 := cacheModel.GetStoreMode(path)
 
 			if storeMode == REMOVE {
+				if cacheModel.DebugMode {
+					log.Printf("  Exclude: %s", path)
+				}
 				return nil
 			}
 
 			if archiveFiles {
 				if header.Typeflag == tar.TypeReg {
-					fStat := info.Sys().(*syscall.Stat_t)
-					header.AccessTime = timespecToTime(fStat.Atimespec)
-					header.ModTime = timespecToTime(fStat.Mtimespec)
-					header.ChangeTime = timespecToTime(fStat.Ctimespec)
+					fStat, ok := info.Sys().(*syscall.Stat_t)
+					if ok {
+						header.AccessTime = timespecToTime(fStat.Atimespec)
+						header.ModTime = timespecToTime(fStat.Mtimespec)
+						header.ChangeTime = timespecToTime(fStat.Ctimespec)
+					}
 				}
 
 				if err := cacheModel.TarWriter.WriteHeader(header); err != nil {
@@ -282,6 +292,9 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 						cacheModel.FilePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
 					}
 				case SKIP:
+					if cacheModel.DebugMode {
+						log.Printf("  Ignore changes: %s", path)
+					}
 					cacheModel.FilePathMap[path] = "-"
 				case INDICATOR:
 					cacheModel.FilePathMap[path] = indicatorFileMD5
@@ -440,20 +453,20 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				return err
 			}
 			if !indicatorFilePathExists {
-				log.Errorf("Indicator file doesn't exists: %s", path)
+				log.Errorf("Indicator file doesn't exists: %s", cleanPath)
 				os.Exit(1)
 			}
 			if indicatorFileInfo.IsDir() {
-				log.Errorf("Indicator path is a directory: %s", path)
+				log.Errorf("Indicator path is a directory: %s", cleanPath)
 				os.Exit(1)
 			}
 
-			pathExists, err := pathutil.IsPathExists(path)
+			pathExists, err := pathutil.IsPathExists(cleanPath)
 			if err != nil {
 				return err
 			}
 			if !pathExists {
-				log.Warnf("Path ignored, does not exists: %s", path)
+				log.Warnf("Path ignored, does not exists: %s", cleanPath)
 				continue
 			}
 
@@ -476,6 +489,7 @@ func (cacheModel *CacheModel) CleanPaths() error {
 			cacheModel.IndicatorHashMap[cleanPath] = indicatorFileChangeIndicator
 		} else {
 			path = strings.TrimSpace(path)
+
 			pathExists, err := pathutil.IsPathExists(path)
 			if err != nil {
 				return err
@@ -484,10 +498,23 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				log.Warnf("Path ignored, does not exists: %s", path)
 				continue
 			}
+
 			cleanedPathList = append(cleanedPathList, path)
 		}
 	}
 	cacheModel.PathList = cleanedPathList
+
+	cleanedIgnoredPathList := []string{}
+	for _, path := range cacheModel.IgnoreList {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+
+		cleanedIgnoredPathList = append(cleanedIgnoredPathList, path)
+	}
+	cacheModel.IgnoreList = cleanedIgnoredPathList
+
 	return nil
 }
 
@@ -518,7 +545,7 @@ func main() {
 	log.Printf("- Took: %s", time.Now().Sub(startTime))
 	fmt.Println()
 
-	if len(cacheModel.FilePathMap) == 0 {
+	if len(cacheModel.PathList) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
@@ -637,16 +664,13 @@ func getFileContentMD5(filePath string) (string, error) {
 		return "", err
 	}
 
-	defer func() (string, error) {
-		err := f.Close()
-		if err != nil {
-			return "", err
-		}
-		return "", nil
-	}()
-
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	err = f.Close()
+	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
