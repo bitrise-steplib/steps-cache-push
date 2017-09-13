@@ -7,10 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/bitrise-io/depman/pathutil",
-			"Rev": "4c59bc31f02a2ae78ce5d8d96a006289cd3e6beb"
-		},
-		{
 			"ImportPath": "github.com/bitrise-io/go-utils/colorstring",
 			"Rev": "6eb582e08179a025ed2deb86ea6dffbd13ba1ff6"
 		},
