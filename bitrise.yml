@@ -75,6 +75,7 @@ workflows:
         run_if: true
         is_skippable: false
         inputs:
+        - compress_archive: true
         - is_debug_mode: true
         - cache_paths: |
             ./another_samples
@@ -106,6 +107,7 @@ workflows:
         run_if: true
         is_skippable: false
         inputs:
+        - compress_archive: true
         - is_debug_mode: true
         - cache_paths: |
             ./another_samples
