@@ -632,7 +632,6 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	}
 
 	fileClosed := false
-
 	defer func() {
 		if fileClosed {
 			return
