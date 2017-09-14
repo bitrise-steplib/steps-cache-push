@@ -2,3 +2,4 @@ go/bin/
 go/pkg/
 .bitrise*
 _tmp
+.gows*
