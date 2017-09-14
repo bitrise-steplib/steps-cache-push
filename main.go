@@ -273,7 +273,7 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return nil
 			}
 
-			if header.Typeflag == tar.TypeReg {
+			if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA {
 				switch storeMode {
 				case STORE:
 					if cacheModel.FileChangeIndicator == MD5 {
