@@ -630,7 +630,13 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
 	}
+
+	fileClosed := false
+
 	defer func() {
+		if fileClosed {
+			return
+		}
 		if err := archFile.Close(); err != nil {
 			log.Printf(" (!) Failed to close archive file (%s): %s", archiveFilePath, err)
 		}
@@ -658,6 +664,8 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("Failed to upload file, response code was: %d", resp.StatusCode)
 	}
+
+	fileClosed = true
 
 	return nil
 }
