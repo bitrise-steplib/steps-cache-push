@@ -234,7 +234,15 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return nil
 			}
 
-			header, err := tar.FileInfoHeader(info, path)
+			link := ""
+			if info.Mode()&os.ModeSymlink != 0 {
+				link, err = os.Readlink(path)
+				if err != nil {
+					return err
+				}
+			}
+
+			header, err := tar.FileInfoHeader(info, link)
 			if err != nil {
 				return err
 			}
