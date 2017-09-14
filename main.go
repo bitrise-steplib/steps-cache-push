@@ -20,6 +20,7 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/bitrise-tools/go-steputils/input"
 	glob "github.com/ryanuber/go-glob"
 )
 
@@ -100,6 +101,8 @@ func (configs *ConfigsModel) print() {
 		log.Printf("  * %s", clnPth)
 	}
 
+	fmt.Println()
+
 	log.Printf("- IgnoredPaths:")
 	for _, path := range strings.Split(configs.IgnoredPaths, "\n") {
 		clnPth := strings.TrimSpace(path)
@@ -109,12 +112,19 @@ func (configs *ConfigsModel) print() {
 		log.Printf("  * %s", clnPth)
 	}
 
+	fmt.Println()
+
 	log.Printf("- CompressArchive: %s", configs.CompressArchive)
 	log.Printf("- FingerprintMethodID: %s", configs.FingerprintMethodID)
 }
 
 func (configs *ConfigsModel) validate() error {
-	// TODO: validate almost everything
+	if err := input.ValidateIfNotEmpty(configs.CacheAPIURL); err != nil {
+		return fmt.Errorf("CacheAPIURL: %s", err)
+	}
+	if err := input.ValidateWithOptions(configs.FingerprintMethodID, fingerprintMethodIDContentChecksum, fingerprintMethodIDFileModTime); err != nil {
+		return fmt.Errorf("FingerprintMethodID: %s", err)
+	}
 
 	return nil
 }
@@ -376,6 +386,13 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 			log.Warnf("REMOVED: %s", prevKey)
 			if prevValue == "-" {
 				log.Donef("- Ignored")
+				if !cacheModel.DebugMode {
+					if logLineCount >= 9 {
+						log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
+						return true, nil
+					}
+				}
+				logLineCount++
 			} else {
 				triggerNewCache = true
 				if !cacheModel.DebugMode {
@@ -384,8 +401,8 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 						return true, nil
 					}
 				}
+				logLineCount++
 			}
-			logLineCount++
 		} else {
 			if currentValue != prevValue {
 				log.Warnf("CHANGED: %s, Current: %s != Previous: %s", prevKey, currentValue, prevValue)
@@ -407,6 +424,13 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 		log.Warnf("ADDED: %s", remainingKey)
 		if remainingValue == "-" {
 			log.Donef("- Ignored")
+			if !cacheModel.DebugMode {
+				if logLineCount >= 9 {
+					log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
+					return true, nil
+				}
+			}
+			logLineCount++
 		} else {
 			triggerNewCache = true
 			if !cacheModel.DebugMode {
@@ -415,8 +439,8 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 					return true, nil
 				}
 			}
+			logLineCount++
 		}
-		logLineCount++
 	}
 
 	return triggerNewCache, nil
@@ -535,12 +559,12 @@ func main() {
 	configs := createConfigsModelFromEnvs()
 	configs.print()
 
+	fmt.Println()
+
 	if err := configs.validate(); err != nil {
 		log.Errorf("Issue with input: %s", err)
 		os.Exit(1)
 	}
-
-	fmt.Println()
 
 	cacheModel := NewCacheModel(configs)
 

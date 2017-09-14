@@ -27,7 +27,6 @@ is_always_run: false
 is_skippable: true
 deps:
   apt_get:
-  - name: rsync
   - name: tar
 run_if: ".IsCI | and (not .IsPR)"
 inputs:
