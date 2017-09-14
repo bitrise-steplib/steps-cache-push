@@ -3,3 +3,4 @@ go/pkg/
 .bitrise*
 _tmp
 .gows*
+_sample_artifacts
