@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -55,16 +54,6 @@ const (
 	// INDICATOR ...
 	INDICATOR = StoreMode(3)
 )
-
-// CacheUploadAPIRequestDataModel ...
-type CacheUploadAPIRequestDataModel struct {
-	FileSizeInBytes int64 `json:"file_size_in_bytes"`
-}
-
-// GenerateUploadURLRespModel ...
-type GenerateUploadURLRespModel struct {
-	UploadURL string `json:"upload_url"`
-}
 
 // CacheModel ...
 type CacheModel struct {
@@ -600,30 +589,12 @@ func timespecToTime(ts syscall.Timespec) time.Time {
 }
 
 func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
-	// requestDataModel := CacheUploadAPIRequestDataModel{
-	// 	FileSizeInBytes: fileSizeInBytes,
-	// }
-
-	// err := json.NewDecoder(c.Request().Body).Decode(provData)
-	// if err != nil {
-	// 	log.Errorf("Failed to decode request body, error: %+v", errors.WithStack(err))
-	// 	return c.Render(http.StatusInternalServerError, r.JSON(map[string]string{"error": "Internal error"}))
-	// }
-
-	requestJSONBytes, err := json.Marshal(map[string]int64{"file_size_in_bytes": fileSizeInBytes})
-	if err != nil {
-		return "", fmt.Errorf("Failed to JSON marshal CacheUploadAPIRequestDataModel: %s", err)
-	}
-
-	req, err := http.NewRequest("POST", cacheAPIURL, bytes.NewBuffer(requestJSONBytes))
+	req, err := http.NewRequest("POST", cacheAPIURL, bytes.NewReader([]byte(fmt.Sprintf(`{"file_size_in_bytes": %d}`, fileSizeInBytes))))
 	if err != nil {
 		return "", fmt.Errorf("Failed to create request: %s", err)
 	}
 
-	client := &http.Client{
-		Timeout: 20 * time.Second,
-	}
-	resp, err := client.Do(req)
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
 	if err != nil {
 		return "", fmt.Errorf("Failed to send request: %s", err)
 	}
@@ -633,27 +604,22 @@ func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error
 		}
 	}()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("Request sent, but failed to read response body (http-code:%d): %s", resp.StatusCode, body)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode > 202 {
-		return "", fmt.Errorf("Upload URL was rejected (http-code:%d): %s", resp.StatusCode, body)
+		return "", fmt.Errorf("Upload URL was rejected (http-code:%d)", resp.StatusCode)
 	}
 
 	var respModel map[string]string
-	if err := json.Unmarshal(body, &respModel); err != nil {
-		return "", fmt.Errorf("Request sent, but failed to parse JSON response (http-code:%d): %s", resp.StatusCode, body)
+	if err := json.NewDecoder(resp.Body).Decode(&respModel); err != nil {
+		return "", fmt.Errorf("Failed to decode response body, error: %+v", err)
 	}
 
 	uploadURL, ok := respModel["upload_url"]
 	if !ok {
-		return "", fmt.Errorf("Request sent, but Upload URL is not received")
+		return "", fmt.Errorf("Request sent, but Upload URL isn't received")
 	}
 
 	if uploadURL == "" {
-		return "", fmt.Errorf("Request sent, but Upload URL is empty (http-code:%d): %s", resp.StatusCode, body)
+		return "", fmt.Errorf("Request sent, but Upload URL is empty (http-code:%d)", resp.StatusCode)
 	}
 
 	return uploadURL, nil
@@ -664,11 +630,7 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
 	}
-	isFileCloseRequired := true
 	defer func() {
-		if !isFileCloseRequired {
-			return
-		}
 		if err := archFile.Close(); err != nil {
 			log.Printf(" (!) Failed to close archive file (%s): %s", archiveFilePath, err)
 		}
@@ -685,7 +647,6 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 		return fmt.Errorf("Failed to create upload request: %s", err)
 	}
 
-	// req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Add("Content-Length", strconv.FormatInt(fileSize, 10))
 	req.ContentLength = fileSize
 
@@ -693,20 +654,8 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to upload: %s", err)
 	}
-	isFileCloseRequired = false
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf(" [!] Failed to close response body: %s", err)
-		}
-	}()
-
-	responseBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("Failed to read response: %s", err)
-	}
 
 	if resp.StatusCode != 200 {
-		log.Printf("=> Upload response: %s", responseBytes)
 		return fmt.Errorf("Failed to upload file, response code was: %d", resp.StatusCode)
 	}
 
