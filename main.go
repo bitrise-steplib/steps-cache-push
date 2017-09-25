@@ -204,11 +204,7 @@ func (cacheModel *CacheModel) CloseTarArchive() error {
 		}
 	}
 
-	if err := cacheModel.TarFile.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return cacheModel.TarFile.Close()
 }
 
 // GenerateCacheInfoMap ...
