@@ -1,6 +1,16 @@
-## Changelog (Current version: 1.1.4)
+## Changelog (Current version: 2.0.0)
 
 -----------------
+
+### 2.0.0 (2017 Sep 26)
+
+* [e2f7aca] Prepare for 2.0.0
+* [6c9abb7] removed log
+* [6977eb4] debug log
+* [5d33f8b] fixed map init
+* [73c704a] do not check fingerprint twice
+* [26d81ff] fix CI
+* [ff8b78c] Changed caching method (#11)
 
 ### 1.1.4 (2017 Aug 04)
 
@@ -70,4 +80,4 @@
 
 -----------------
 
-Updated: 2017 Aug 04
+Updated: 2017 Sep 26
