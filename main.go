@@ -218,8 +218,6 @@ func (cacheModel *CacheModel) GenerateCacheInfoMap() (map[string]string, error) 
 
 // ProcessFiles ...
 func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
-	cacheModel.FilePathMap = map[string]string{}
-
 	for _, cachePath := range cacheModel.PathList {
 		if err := filepath.Walk(cachePath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -266,6 +264,10 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 			}
 
 			if info.IsDir() {
+				return nil
+			}
+
+			if val, ok := cacheModel.FilePathMap[path]; ok && val != "" {
 				return nil
 			}
 
