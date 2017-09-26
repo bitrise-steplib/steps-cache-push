@@ -135,8 +135,8 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 	splittedIgnoredPaths := strings.Split(configs.IgnoredPaths, "\n")
 
 	return &CacheModel{
-		PathList:            splittedPaths,
-		FilePathMap:         map[string]string{},
+		PathList: splittedPaths,
+		//FilePathMap:         map[string]string{},
 		IndicatorHashMap:    map[string]string{},
 		PreviousFilePathMap: map[string]string{},
 		IgnoreList:          splittedIgnoredPaths,
@@ -213,11 +213,25 @@ func (cacheModel *CacheModel) GenerateCacheInfoMap() (map[string]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	return cacheModel.FilePathMap, nil
+
+	duplicateFilePathMap := map[string]string{}
+	for k, v := range cacheModel.FilePathMap {
+		duplicateFilePathMap[k] = v
+	}
+
+	return duplicateFilePathMap, nil
 }
 
 // ProcessFiles ...
 func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
+	isFilePathMapGeneratedAlready := false
+
+	if cacheModel.FilePathMap != nil {
+		isFilePathMapGeneratedAlready = true
+	} else {
+		cacheModel.FilePathMap = map[string]string{}
+	}
+
 	for _, cachePath := range cacheModel.PathList {
 		if err := filepath.Walk(cachePath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -267,31 +281,28 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return nil
 			}
 
-			if val, ok := cacheModel.FilePathMap[path]; ok && val != "" {
-				return nil
-			}
-
 			if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA {
-				switch storeMode {
-				case STORE:
-					if cacheModel.FileChangeIndicator == MD5 {
-						fileMD5, err := getFileContentMD5(path)
-						if err != nil {
-							return err
+				if !isFilePathMapGeneratedAlready {
+					switch storeMode {
+					case STORE:
+						if cacheModel.FileChangeIndicator == MD5 {
+							fileMD5, err := getFileContentMD5(path)
+							if err != nil {
+								return err
+							}
+							cacheModel.FilePathMap[path] = fileMD5
+						} else if cacheModel.FileChangeIndicator == MODTIME {
+							cacheModel.FilePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
 						}
-						cacheModel.FilePathMap[path] = fileMD5
-					} else if cacheModel.FileChangeIndicator == MODTIME {
-						cacheModel.FilePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
+					case SKIP:
+						if cacheModel.DebugMode {
+							log.Printf("  Ignore changes: %s", path)
+						}
+						cacheModel.FilePathMap[path] = "-"
+					case INDICATOR:
+						cacheModel.FilePathMap[path] = indicatorFileMD5
 					}
-				case SKIP:
-					if cacheModel.DebugMode {
-						log.Printf("  Ignore changes: %s", path)
-					}
-					cacheModel.FilePathMap[path] = "-"
-				case INDICATOR:
-					cacheModel.FilePathMap[path] = indicatorFileMD5
 				}
-
 				if archiveFiles {
 					file, err := os.Open(path)
 					if err != nil {
