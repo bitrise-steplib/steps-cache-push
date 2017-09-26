@@ -232,6 +232,8 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 		cacheModel.FilePathMap = map[string]string{}
 	}
 
+	log.Warnf("isFilePathMapGeneratedAlready: %t", isFilePathMapGeneratedAlready)
+
 	for _, cachePath := range cacheModel.PathList {
 		if err := filepath.Walk(cachePath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
