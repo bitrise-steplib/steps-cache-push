@@ -1,6 +1,11 @@
-## Changelog (Current version: 2.0.0)
+## Changelog (Current version: 2.0.1)
 
 -----------------
+
+### 2.0.1 (2017 Sep 27)
+
+* [384cc15] Prepare for 2.0.1
+* [25dce13] Do not fail if indicator file doesn't exists
 
 ### 2.0.0 (2017 Sep 26)
 
@@ -80,4 +85,4 @@
 
 -----------------
 
-Updated: 2017 Sep 26
+Updated: 2017 Sep 27
