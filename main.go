@@ -472,10 +472,12 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				return err
 			}
 			if !indicatorFilePathExists {
-				return fmt.Errorf("Indicator file doesn't exists: %s", cleanPath)
+				log.Warnf("Path ignored, indicator file doesn't exists: %s", cleanPath)
+				continue
 			}
 			if indicatorFileInfo.IsDir() {
-				return fmt.Errorf("Indicator path is a directory: %s", cleanPath)
+				log.Warnf("Path ignored, indicator path is a directory: %s", cleanPath)
+				continue
 			}
 
 			pathExists, err := pathutil.IsPathExists(cleanPath)
