@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/bitrise-io/go-utils/sliceutil"
 	"github.com/bitrise-tools/go-steputils/input"
 	glob "github.com/ryanuber/go-glob"
 )
@@ -136,7 +138,7 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 
 	return &CacheModel{
 		PathList: splittedPaths,
-		//FilePathMap:         map[string]string{},
+		//FilePathMap:       map[string]string{},
 		IndicatorHashMap:    map[string]string{},
 		PreviousFilePathMap: map[string]string{},
 		IgnoreList:          splittedIgnoredPaths,
@@ -454,11 +456,27 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 	return triggerNewCache, nil
 }
 
+func cleanDuplicatePaths(paths []string) []string {
+	cleanedPaths := []string{}
+	for _, item := range paths {
+		if item == "" {
+			continue
+		}
+		cleanPath := path.Clean(item)
+		if !sliceutil.IsStringInSlice(cleanPath, cleanedPaths) {
+			cleanedPaths = append(cleanedPaths, cleanPath)
+		}
+	}
+
+	return cleanedPaths
+}
+
 // CleanPaths ...
 func (cacheModel *CacheModel) CleanPaths() error {
 	cleanedPathList := []string{}
+	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
 
-	for _, path := range cacheModel.PathList {
+	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
 			continue
 		}
@@ -537,7 +555,6 @@ func (cacheModel *CacheModel) CleanPaths() error {
 		}
 	}
 	cacheModel.PathList = cleanedPathList
-
 	cleanedIgnoredPathList := []string{}
 	for _, path := range cacheModel.IgnoreList {
 		path = strings.TrimSpace(path)
