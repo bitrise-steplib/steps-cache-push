@@ -1,6 +1,11 @@
-## Changelog (Current version: 2.0.1)
+## Changelog (Current version: 2.0.2)
 
 -----------------
+
+### 2.0.2 (2017 Oct 10)
+
+* [5c56919] Prepare for 2.0.2
+* [f62733c] Remove duplicate paths (#12)
 
 ### 2.0.1 (2017 Sep 27)
 
@@ -85,4 +90,4 @@
 
 -----------------
 
-Updated: 2017 Sep 27
+Updated: 2017 Oct 10
