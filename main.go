@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -136,7 +137,7 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 
 	return &CacheModel{
 		PathList: splittedPaths,
-		//FilePathMap:         map[string]string{},
+		//FilePathMap:       map[string]string{},
 		IndicatorHashMap:    map[string]string{},
 		PreviousFilePathMap: map[string]string{},
 		IgnoreList:          splittedIgnoredPaths,
@@ -454,11 +455,33 @@ func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string
 	return triggerNewCache, nil
 }
 
+func cleanDuplicatePaths(paths []string) []string {
+	cleanedPaths := []string{}
+	for _, item := range paths {
+		if item == "" {
+			continue
+		}
+		cleanPath := path.Clean(item)
+		cleanedPaths = append(cleanedPaths, cleanPath)
+	}
+
+	toReturn := []string{}
+	seen := map[string]string{}
+	for _, val := range cleanedPaths {
+		if _, ok := seen[val]; !ok {
+			toReturn = append(toReturn, val)
+			seen[val] = val
+		}
+	}
+
+	return toReturn
+}
+
 // CleanPaths ...
 func (cacheModel *CacheModel) CleanPaths() error {
 	cleanedPathList := []string{}
-
-	for _, path := range cacheModel.PathList {
+	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
+	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
 			continue
 		}
@@ -537,9 +560,9 @@ func (cacheModel *CacheModel) CleanPaths() error {
 		}
 	}
 	cacheModel.PathList = cleanedPathList
-
 	cleanedIgnoredPathList := []string{}
-	for _, path := range cacheModel.IgnoreList {
+	ignoreListWithoutDuplicates := cleanDuplicatePaths(cacheModel.IgnoreList)
+	for _, path := range ignoreListWithoutDuplicates {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
