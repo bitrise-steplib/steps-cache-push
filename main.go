@@ -20,6 +20,7 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/bitrise-io/go-utils/sliceutil"
 	"github.com/bitrise-tools/go-steputils/input"
 	glob "github.com/ryanuber/go-glob"
 )
@@ -462,25 +463,19 @@ func cleanDuplicatePaths(paths []string) []string {
 			continue
 		}
 		cleanPath := path.Clean(item)
-		cleanedPaths = append(cleanedPaths, cleanPath)
-	}
-
-	toReturn := []string{}
-	seen := map[string]string{}
-	for _, val := range cleanedPaths {
-		if _, ok := seen[val]; !ok {
-			toReturn = append(toReturn, val)
-			seen[val] = val
+		if !sliceutil.IsStringInSlice(cleanPath, cleanedPaths) {
+			cleanedPaths = append(cleanedPaths, cleanPath)
 		}
 	}
 
-	return toReturn
+	return cleanedPaths
 }
 
 // CleanPaths ...
 func (cacheModel *CacheModel) CleanPaths() error {
 	cleanedPathList := []string{}
 	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
+
 	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
 			continue
@@ -561,8 +556,7 @@ func (cacheModel *CacheModel) CleanPaths() error {
 	}
 	cacheModel.PathList = cleanedPathList
 	cleanedIgnoredPathList := []string{}
-	ignoreListWithoutDuplicates := cleanDuplicatePaths(cacheModel.IgnoreList)
-	for _, path := range ignoreListWithoutDuplicates {
+	for _, path := range cacheModel.IgnoreList {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
