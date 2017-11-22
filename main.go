@@ -471,10 +471,23 @@ func cleanDuplicatePaths(paths []string) []string {
 	return cleanedPaths
 }
 
+func evaluateTildeInPaths(paths []string) []string {
+	homePath := os.Getenv("HOME")
+
+	for i := range paths {
+		if strings.HasPrefix(paths[i], "~") {
+			paths[i] = homePath + paths[i][1:]
+		}
+	}
+
+	return paths
+}
+
 // CleanPaths ...
 func (cacheModel *CacheModel) CleanPaths() error {
 	cleanedPathList := []string{}
 	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
+	pathListWithoutDuplicates = evaluateTildeInPaths(pathListWithoutDuplicates)
 
 	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
