@@ -54,6 +54,7 @@ workflows:
             ../_sample_artifacts/filestructure -> ../_sample_artifacts/filestructure/build/findme.test
             ./DoesNotExist/
             ./DoesNotExist
+            ~/DoesNotExist
             /Does/not/exists
             ../_sample_artifacts/ipas
             ../_sample_artifacts/ipas/
