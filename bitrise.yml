@@ -61,6 +61,8 @@ workflows:
             ../_sample_artifacts/filestructure/build/test.bin
         - ignore_check_on_paths: |-
             ../_sample_artifacts/filestructure/sub-dir
+            ~/DoesNotExists/This
+            !~/.android/dir
             *.apk
     - script:
         title: Create another samples

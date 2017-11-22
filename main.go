@@ -580,7 +580,11 @@ func (cacheModel *CacheModel) CleanPaths() error {
 			continue
 		}
 
-		path = evaluateTildeInPath(path)
+		if strings.HasPrefix(path, "!") {
+			path = "!" + evaluateTildeInPath(strings.TrimPrefix(path, "!"))
+		} else {
+			path = evaluateTildeInPath(path)
+		}
 
 		if !strings.Contains(path, "*") {
 			var err error
