@@ -502,7 +502,7 @@ func (cacheModel *CacheModel) CleanPaths() error {
 				return err
 			}
 			if !indicatorFilePathExists {
-				log.Warnf("Path ignored, indicator file(%s) doesn't exists: %s", indicatorFilePath, cleanPath)
+				log.Warnf("Path ignored, indicator file (%s) doesn't exists: %s", indicatorFilePath, cleanPath)
 				continue
 			}
 			if indicatorFileInfo.IsDir() {
