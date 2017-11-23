@@ -148,7 +148,7 @@ inputs:
       summary: "Collected regularly changing files or extensions by steps from the build"
       is_required: true
       is_dont_change_value: true
-  - cache_api_url: "gr" #$BITRISE_CACHE_API_URL
+  - cache_api_url: $BITRISE_CACHE_API_URL
     opts:
       title: "TMP: Cache Upload URL"
       summary: "Cache Upload URL"
@@ -156,7 +156,7 @@ inputs:
         Cache Upload URL
       is_required: true
       is_dont_change_value: true
-  - compare_cache_info_path: "ger" #$BITRISE_CACHE_INFO_PATH
+  - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
     opts:
       title: "Cache Info file path, for compare"
       summary: "Compare the fingerprints against this Cache Info"
