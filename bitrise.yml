@@ -54,12 +54,16 @@ workflows:
             ../_sample_artifacts/filestructure -> ../_sample_artifacts/filestructure/build/findme.test
             ./DoesNotExist/
             ./DoesNotExist
+            ~/DoesNotExist
             /Does/not/exists
+            ~/.android -> ~/.lockfile
             ../_sample_artifacts/ipas
             ../_sample_artifacts/ipas/
             ../_sample_artifacts/filestructure/build/test.bin
         - ignore_check_on_paths: |-
             ../_sample_artifacts/filestructure/sub-dir
+            ~/DoesNotExists/This
+            !~/.android/dir
             *.apk
     - script:
         title: Create another samples
@@ -205,24 +209,20 @@ workflows:
 
   # ----------------------------------------------------------------
   # --- Utility workflows
-  godeps-update:
-    title: Godeps update
+  dep-update:
+    title: Dep update
     description: |
-      Used for updating bitrise dependencies with godep
+      Used for updating bitrise dependencies with dep
     steps:
     - script:
         title: Dependency update
         inputs:
-        - content: |
+        - content: |-
             #!/bin/bash
             set -ex
-            go get -u -v github.com/tools/godep
-            go get github.com/davecgh/go-spew/spew
-            go get github.com/pmezard/go-difflib/difflib
-            rm -rf ./Godeps
-            rm -rf ./vendor
-            go get -t -d ./...
-            godep save ./...
+            go get -u -v github.com/golang/dep/cmd/dep
+            dep ensure -v
+            dep ensure -v -update
   
   # ----------------------------------------------------------------
   # --- workflows to create Release
