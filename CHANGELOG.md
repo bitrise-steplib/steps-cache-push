@@ -1,6 +1,11 @@
-## Changelog (Current version: 2.0.2)
+## Changelog (Current version: 2.0.3)
 
 -----------------
+
+### 2.0.3 (2017 Nov 23)
+
+* [4c30669] Prepare for 2.0.3
+* [8175872] Tilde expand (#13)
 
 ### 2.0.2 (2017 Oct 10)
 
@@ -90,4 +95,4 @@
 
 -----------------
 
-Updated: 2017 Oct 10
+Updated: 2017 Nov 23
