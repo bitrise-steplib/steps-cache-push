@@ -471,28 +471,10 @@ func cleanDuplicatePaths(paths []string) []string {
 	return cleanedPaths
 }
 
-func evaluateTildeInPath(path string) string {
-	homePath := os.Getenv("HOME")
-
-	if strings.HasPrefix(path, "~") {
-		return homePath + path[1:]
-	}
-
-	return path
-}
-
-func evaluateTildeInPaths(paths []string) []string {
-	for i := range paths {
-		paths[i] = evaluateTildeInPath(paths[i])
-	}
-	return paths
-}
-
 // CleanPaths ...
 func (cacheModel *CacheModel) CleanPaths() error {
 	cleanedPathList := []string{}
 	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
-	pathListWithoutDuplicates = evaluateTildeInPaths(pathListWithoutDuplicates)
 
 	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
@@ -503,12 +485,24 @@ func (cacheModel *CacheModel) CleanPaths() error {
 			cleanPath := strings.TrimSpace(splittedPath[0])
 			indicatorFilePath := strings.TrimSpace(splittedPath[1])
 
+			var err error
+			cleanPath, err = pathutil.ExpandTilde(cleanPath)
+			if err != nil {
+				log.Warnf("%s, ignoring...", err)
+				continue
+			}
+			indicatorFilePath, err = pathutil.ExpandTilde(indicatorFilePath)
+			if err != nil {
+				log.Warnf("%s, ignoring...", err)
+				continue
+			}
+
 			indicatorFileInfo, indicatorFilePathExists, err := pathutil.PathCheckAndInfos(indicatorFilePath)
 			if err != nil {
 				return err
 			}
 			if !indicatorFilePathExists {
-				log.Warnf("Path ignored, indicator file doesn't exists: %s", cleanPath)
+				log.Warnf("Path ignored, indicator file(%s) doesn't exists: %s", indicatorFilePath, cleanPath)
 				continue
 			}
 			if indicatorFileInfo.IsDir() {
@@ -581,9 +575,20 @@ func (cacheModel *CacheModel) CleanPaths() error {
 		}
 
 		if strings.HasPrefix(path, "!") {
-			path = "!" + evaluateTildeInPath(strings.TrimPrefix(path, "!"))
+			expandedPth, err := pathutil.ExpandTilde(strings.TrimPrefix(path, "!"))
+			if err != nil {
+				log.Warnf("%s, ignoring...", err)
+				continue
+			}
+
+			path = "!" + expandedPth
 		} else {
-			path = evaluateTildeInPath(path)
+			expandedPth, err := pathutil.ExpandTilde(path)
+			if err != nil {
+				log.Warnf("%s, ignoring...", err)
+				continue
+			}
+			path = expandedPth
 		}
 
 		if !strings.Contains(path, "*") {

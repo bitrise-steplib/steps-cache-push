@@ -1,0 +1,12 @@
+
+[[constraint]]
+  name = "github.com/bitrise-io/go-utils"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/bitrise-tools/go-steputils"
+  branch = "master"
+
+[[constraint]]
+  version = "0.1.0"
+  name = "github.com/ryanuber/go-glob"
