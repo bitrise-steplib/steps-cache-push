@@ -1,6 +1,12 @@
-## Changelog (Current version: 2.0.3)
+## Changelog (Current version: 2.0.4)
 
 -----------------
+
+### 2.0.4 (2018 Jan 25)
+
+* [bd26010] Bump version to 2.0.4
+* [53e032b] Merge pull request #14 from bitrise-steplib/viktorbenei-patch-1
+* [21dbc5d] $BITRISE_CACHE_DIR should be cached by default
 
 ### 2.0.3 (2017 Nov 23)
 
@@ -95,4 +101,4 @@
 
 -----------------
 
-Updated: 2017 Nov 23
+Updated: 2018 Jan 25
