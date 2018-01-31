@@ -240,7 +240,7 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				return err
 			}
 
-			if filepath.Dir(path) == filepath.Dir(cachePath) {
+			if info.IsDir() && filepath.Dir(path) == filepath.Dir(cachePath) {
 				return nil
 			}
 
