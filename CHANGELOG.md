@@ -1,6 +1,12 @@
-## Changelog (Current version: 2.0.4)
+## Changelog (Current version: 2.0.5)
 
 -----------------
+
+### 2.0.5 (2018 Jan 31)
+
+* [423e586] Bum[p version to 2.0.5
+* [c766775] Merge pull request #15 from bitrise-steplib/fix/file-cache
+* [b39f0ae] Ignore root dir only if it is a directory
 
 ### 2.0.4 (2018 Jan 25)
 
@@ -101,4 +107,4 @@
 
 -----------------
 
-Updated: 2018 Jan 25
+Updated: 2018 Jan 31
