@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/bitrise-io/go-utils/command"
-
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
@@ -147,15 +146,6 @@ func CloseTarArchive(filePathMap map[string]string, tarWriter *tar.Writer, gzipW
 	}
 
 	return tarFile.Close()
-}
-
-// GenerateCacheInfoMap ...
-func GenerateCacheInfoMap(indicatorHashMap, filePathMap map[string]string, pathList, ignoreList []string, indicator ChangeIndicator, tarWriter *tar.Writer, archiveFiles bool) (newFilePathMap map[string]string, err error) {
-	filePathMap, err = ProcessFiles(indicatorHashMap, filePathMap, pathList, ignoreList, indicator, tarWriter, archiveFiles, false)
-	if err != nil {
-		return
-	}
-	return
 }
 
 // ProcessFiles ...
@@ -739,7 +729,7 @@ func main() {
 	if cacheInfoFileExists {
 		startTime = time.Now()
 		log.Infof("Checking for file changes")
-		filePathsMap, err := GenerateCacheInfoMap(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, cacheModel.CompressArchive)
+		filePathsMap, err := ProcessFiles(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, false, configs.DebugMode == "true")
 		if err != nil {
 			log.Errorf("Failed to generate files map, error: %+v", err)
 			os.Exit(1)
@@ -779,7 +769,7 @@ func main() {
 	cacheModel.TarWriter = tarWriter
 	cacheModel.TarFile = tarFile
 
-	filePathMap, err := ProcessFiles(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, cacheModel.CompressArchive, true)
+	filePathMap, err := ProcessFiles(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, true, configs.DebugMode == "true")
 	if err != nil {
 		log.Errorf("Failed to process files, error: %+v", err)
 		os.Exit(1)
