@@ -17,11 +17,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/bitrise-io/go-utils/sliceutil"
-	"github.com/bitrise-tools/go-steputils/input"
 	glob "github.com/ryanuber/go-glob"
 )
 
@@ -72,67 +72,8 @@ type CacheModel struct {
 	IndicatorHashMap    map[string]string
 }
 
-// ConfigsModel ...
-type ConfigsModel struct {
-	Paths               string
-	IgnoredPaths        string
-	DebugMode           string
-	CacheAPIURL         string
-	FingerprintMethodID string
-	CompressArchive     string
-}
-
-func (configs *ConfigsModel) print() {
-	log.Printf("- CachePaths:")
-	for _, path := range strings.Split(configs.Paths, "\n") {
-		clnPth := strings.TrimSpace(path)
-		if clnPth == "" {
-			continue
-		}
-		log.Printf("  * %s", clnPth)
-	}
-
-	fmt.Println()
-
-	log.Printf("- IgnoredPaths:")
-	for _, path := range strings.Split(configs.IgnoredPaths, "\n") {
-		clnPth := strings.TrimSpace(path)
-		if clnPth == "" {
-			continue
-		}
-		log.Printf("  * %s", clnPth)
-	}
-
-	fmt.Println()
-
-	log.Printf("- CompressArchive: %s", configs.CompressArchive)
-	log.Printf("- FingerprintMethodID: %s", configs.FingerprintMethodID)
-}
-
-func (configs *ConfigsModel) validate() error {
-	if err := input.ValidateIfNotEmpty(configs.CacheAPIURL); err != nil {
-		return fmt.Errorf("CacheAPIURL: %s", err)
-	}
-	if err := input.ValidateWithOptions(configs.FingerprintMethodID, fingerprintMethodIDContentChecksum, fingerprintMethodIDFileModTime); err != nil {
-		return fmt.Errorf("FingerprintMethodID: %s", err)
-	}
-
-	return nil
-}
-
-func createConfigsModelFromEnvs() *ConfigsModel {
-	return &ConfigsModel{
-		DebugMode:           os.Getenv("is_debug_mode"),
-		CacheAPIURL:         os.Getenv("cache_api_url"),
-		CompressArchive:     os.Getenv("compress_archive"),
-		FingerprintMethodID: os.Getenv("fingerprint_method"),
-		Paths:               os.Getenv("cache_paths") + "\n" + os.Getenv("bitrise_cache_include_paths"),
-		IgnoredPaths:        os.Getenv("ignore_check_on_paths") + "\n" + os.Getenv("bitrise_cache_exclude_paths"),
-	}
-}
-
 // NewCacheModel ...
-func NewCacheModel(configs *ConfigsModel) *CacheModel {
+func NewCacheModel(configs *Config) *CacheModel {
 	splittedPaths := strings.Split(configs.Paths, "\n")
 	splittedIgnoredPaths := strings.Split(configs.IgnoredPaths, "\n")
 
@@ -149,31 +90,29 @@ func NewCacheModel(configs *ConfigsModel) *CacheModel {
 }
 
 // CreateTarArchive ...
-func (cacheModel *CacheModel) CreateTarArchive() error {
-	tarFile, err := os.Create(cacheArchivePath)
+func CreateTarArchive(compressArchive bool) (gzipWriter *gzip.Writer, tarWriter *tar.Writer, tarFile *os.File, err error) {
+	tarFile, err = os.Create(cacheArchivePath)
 	if err != nil {
-		return err
+		return
 	}
 
-	if cacheModel.CompressArchive {
-		gw, err := gzip.NewWriterLevel(tarFile, gzip.BestCompression)
+	if compressArchive {
+		gzipWriter, err = gzip.NewWriterLevel(tarFile, gzip.BestCompression)
 		if err != nil {
-			return err
+			return
 		}
 
-		cacheModel.GzipWriter = gw
-		cacheModel.TarWriter = tar.NewWriter(gw)
+		tarWriter = tar.NewWriter(gzipWriter)
 	} else {
-		cacheModel.TarWriter = tar.NewWriter(tarFile)
+		tarWriter = tar.NewWriter(tarFile)
 	}
 
-	cacheModel.TarFile = tarFile
-	return nil
+	return
 }
 
 // CloseTarArchive ...
-func (cacheModel *CacheModel) CloseTarArchive() error {
-	filePathMapBytes, err := json.Marshal(cacheModel.FilePathMap)
+func CloseTarArchive(filePathMap map[string]string, tarWriter *tar.Writer, gzipWriter *gzip.Writer, tarFile *os.File, compressArchive bool) error {
+	filePathMapBytes, err := json.Marshal(filePathMap)
 	if err != nil {
 		return err
 	}
@@ -188,53 +127,38 @@ func (cacheModel *CacheModel) CloseTarArchive() error {
 		ModTime:  time.Now(),
 	}
 
-	if err := cacheModel.TarWriter.WriteHeader(closingHeader); err != nil {
+	if err := tarWriter.WriteHeader(closingHeader); err != nil {
 		return err
 	}
 
-	if _, err := io.Copy(cacheModel.TarWriter, bytes.NewReader(filePathMapBytes)); err != nil && err != io.EOF {
+	if _, err := io.Copy(tarWriter, bytes.NewReader(filePathMapBytes)); err != nil && err != io.EOF {
 		return err
 	}
 
-	if err := cacheModel.TarWriter.Close(); err != nil {
+	if err := tarWriter.Close(); err != nil {
 		return err
 	}
 
-	if cacheModel.CompressArchive {
-		if err := cacheModel.GzipWriter.Close(); err != nil {
+	if compressArchive {
+		if err := gzipWriter.Close(); err != nil {
 			return err
 		}
 	}
 
-	return cacheModel.TarFile.Close()
-}
-
-// GenerateCacheInfoMap ...
-func (cacheModel *CacheModel) GenerateCacheInfoMap() (map[string]string, error) {
-	err := cacheModel.ProcessFiles(false)
-	if err != nil {
-		return nil, err
-	}
-
-	duplicateFilePathMap := map[string]string{}
-	for k, v := range cacheModel.FilePathMap {
-		duplicateFilePathMap[k] = v
-	}
-
-	return duplicateFilePathMap, nil
+	return tarFile.Close()
 }
 
 // ProcessFiles ...
-func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
+func ProcessFiles(indicatorHashMap, filePathMap map[string]string, pathList, ignoreList []string, indicator ChangeIndicator, writer *tar.Writer, archiveFiles, debug bool) (map[string]string, error) {
 	isFilePathMapGeneratedAlready := false
 
-	if cacheModel.FilePathMap != nil {
+	if filePathMap != nil {
 		isFilePathMapGeneratedAlready = true
 	} else {
-		cacheModel.FilePathMap = map[string]string{}
+		filePathMap = map[string]string{}
 	}
 
-	for _, cachePath := range cacheModel.PathList {
+	for _, cachePath := range pathList {
 		if err := filepath.Walk(cachePath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -264,17 +188,17 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				header.Name += "/"
 			}
 
-			storeMode, indicatorFileMD5 := cacheModel.GetStoreMode(path)
+			storeMode, indicatorFileMD5 := GetStoreMode(indicatorHashMap, ignoreList, path)
 
 			if storeMode == REMOVE {
-				if cacheModel.DebugMode {
+				if debug {
 					log.Printf("  Exclude: %s", path)
 				}
 				return nil
 			}
 
 			if archiveFiles {
-				if err := cacheModel.TarWriter.WriteHeader(header); err != nil {
+				if err := writer.WriteHeader(header); err != nil {
 					return err
 				}
 			}
@@ -287,22 +211,22 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 				if !isFilePathMapGeneratedAlready {
 					switch storeMode {
 					case STORE:
-						if cacheModel.FileChangeIndicator == MD5 {
+						if indicator == MD5 {
 							fileMD5, err := getFileContentMD5(path)
 							if err != nil {
 								return err
 							}
-							cacheModel.FilePathMap[path] = fileMD5
-						} else if cacheModel.FileChangeIndicator == MODTIME {
-							cacheModel.FilePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
+							filePathMap[path] = fileMD5
+						} else if indicator == MODTIME {
+							filePathMap[path] = fmt.Sprintf("%d", info.ModTime().Unix())
 						}
 					case SKIP:
-						if cacheModel.DebugMode {
+						if debug {
 							log.Printf("  Ignore changes: %s", path)
 						}
-						cacheModel.FilePathMap[path] = "-"
+						filePathMap[path] = "-"
 					case INDICATOR:
-						cacheModel.FilePathMap[path] = indicatorFileMD5
+						filePathMap[path] = indicatorFileMD5
 					}
 				}
 				if archiveFiles {
@@ -317,7 +241,7 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 						}
 					}()
 
-					_, err = io.CopyN(cacheModel.TarWriter, file, info.Size())
+					_, err = io.CopyN(writer, file, info.Size())
 					if err != nil && err != io.EOF {
 						return err
 					}
@@ -325,21 +249,21 @@ func (cacheModel *CacheModel) ProcessFiles(archiveFiles bool) error {
 			}
 			return nil
 		}); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return filePathMap, nil
 }
 
 // GetStoreMode ...
-func (cacheModel *CacheModel) GetStoreMode(path string) (StoreMode, string) {
-	for key, value := range cacheModel.IndicatorHashMap {
+func GetStoreMode(indicatorHashMap map[string]string, ignoreList []string, path string) (StoreMode, string) {
+	for key, value := range indicatorHashMap {
 		if strings.HasPrefix(path, key) {
 			return INDICATOR, value
 		}
 	}
 
-	for _, ignoreFilter := range cacheModel.IgnoreList {
+	for _, ignoreFilter := range ignoreList {
 		ignoreFromArchive := strings.HasPrefix(ignoreFilter, "!")
 		cleanedIgnoreFilter := strings.TrimSpace(strings.TrimPrefix(ignoreFilter, "!"))
 
@@ -363,26 +287,27 @@ func (cacheModel *CacheModel) GetStoreMode(path string) (StoreMode, string) {
 }
 
 // LoadPreviousFilePathMap ...
-func (cacheModel *CacheModel) LoadPreviousFilePathMap() (bool, error) {
+func LoadPreviousFilePathMap() (map[string]string, bool, error) {
 	exists, err := pathutil.IsPathExists(cacheInfoFilePath)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if !exists {
-		return false, nil
+		return nil, false, nil
 	}
 
 	fileBytes, err := fileutil.ReadBytesFromFile(cacheInfoFilePath)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
-	err = json.Unmarshal(fileBytes, &cacheModel.PreviousFilePathMap)
+	var previousFilePathMap map[string]string
+	err = json.Unmarshal(fileBytes, &previousFilePathMap)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
-	return true, nil
+	return previousFilePathMap, true, nil
 }
 
 // CompareFilePathMaps ...
@@ -472,9 +397,12 @@ func cleanDuplicatePaths(paths []string) []string {
 }
 
 // CleanPaths ...
-func (cacheModel *CacheModel) CleanPaths() error {
-	cleanedPathList := []string{}
-	pathListWithoutDuplicates := cleanDuplicatePaths(cacheModel.PathList)
+func CleanPaths(pathList, ignorePathList []string, indicator ChangeIndicator) ([]string, []string, map[string]string, error) {
+	indicatorHashMap := map[string]string{}
+	var cleanedPathList []string
+	var cleanedIgnoredPathList []string
+
+	pathListWithoutDuplicates := cleanDuplicatePaths(pathList)
 
 	for _, path := range pathListWithoutDuplicates {
 		if strings.TrimSpace(path) == "" {
@@ -499,7 +427,7 @@ func (cacheModel *CacheModel) CleanPaths() error {
 
 			indicatorFileInfo, indicatorFilePathExists, err := pathutil.PathCheckAndInfos(indicatorFilePath)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 			if !indicatorFilePathExists {
 				log.Warnf("Path ignored, indicator file (%s) doesn't exists: %s", indicatorFilePath, cleanPath)
@@ -512,7 +440,7 @@ func (cacheModel *CacheModel) CleanPaths() error {
 
 			pathExists, err := pathutil.IsPathExists(cleanPath)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 			if !pathExists {
 				log.Warnf("Path ignored, does not exists: %s", cleanPath)
@@ -521,37 +449,37 @@ func (cacheModel *CacheModel) CleanPaths() error {
 
 			cleanPath, err = filepath.Abs(cleanPath)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 
 			indicatorFilePath, err = filepath.Abs(indicatorFilePath)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 
 			indicatorFileChangeIndicator := ""
 
-			if cacheModel.FileChangeIndicator == MD5 {
+			if indicator == MD5 {
 				indicatorFileChangeIndicator, err = getFileContentMD5(indicatorFilePath)
 				if err != nil {
-					return err
+					return nil, nil, nil, err
 				}
-			} else if cacheModel.FileChangeIndicator == MODTIME {
+			} else if indicator == MODTIME {
 				fi, err := os.Stat(indicatorFilePath)
 				if err != nil {
-					return err
+					return nil, nil, nil, err
 				}
 				indicatorFileChangeIndicator = fmt.Sprintf("%d", fi.ModTime().Unix())
 			}
 
 			cleanedPathList = append(cleanedPathList, cleanPath)
-			cacheModel.IndicatorHashMap[cleanPath] = indicatorFileChangeIndicator
+			indicatorHashMap[cleanPath] = indicatorFileChangeIndicator
 		} else {
 			path = strings.TrimSpace(path)
 
 			pathExists, err := pathutil.IsPathExists(path)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 			if !pathExists {
 				log.Warnf("Path ignored, does not exists: %s", path)
@@ -560,15 +488,14 @@ func (cacheModel *CacheModel) CleanPaths() error {
 
 			path, err = filepath.Abs(path)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 
 			cleanedPathList = append(cleanedPathList, path)
 		}
 	}
-	cacheModel.PathList = cleanedPathList
-	cleanedIgnoredPathList := []string{}
-	for _, path := range cacheModel.IgnoreList {
+
+	for _, path := range ignorePathList {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
@@ -595,18 +522,17 @@ func (cacheModel *CacheModel) CleanPaths() error {
 			var err error
 			path, err = filepath.Abs(path)
 			if err != nil {
-				return err
+				return nil, nil, nil, err
 			}
 		}
 
 		cleanedIgnoredPathList = append(cleanedIgnoredPathList, path)
 	}
-	cacheModel.IgnoreList = cleanedIgnoredPathList
 
-	return nil
+	return cleanedPathList, cleanedIgnoredPathList, indicatorHashMap, nil
 }
 
-func (configs *ConfigsModel) uploadArchive() error {
+func uploadArchive(cacheAPIURL string) error {
 	fi, err := os.Stat(cacheArchivePath)
 	if err != nil {
 		return fmt.Errorf("Failed to get File Infos of Archive (%s): %s", cacheArchivePath, err)
@@ -614,7 +540,7 @@ func (configs *ConfigsModel) uploadArchive() error {
 	sizeInBytes := fi.Size()
 	log.Printf("   Archive file size: %d bytes / %f MB", sizeInBytes, (float64(sizeInBytes) / 1024.0 / 1024.0))
 
-	uploadURL, err := getCacheUploadURL(configs.CacheAPIURL, sizeInBytes)
+	uploadURL, err := getCacheUploadURL(cacheAPIURL, sizeInBytes)
 	if err != nil {
 		return fmt.Errorf("Failed to generate Upload URL: %s", err)
 	}
@@ -654,6 +580,10 @@ func timespecToTime(ts syscall.Timespec) time.Time {
 }
 
 func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
+	if strings.HasPrefix(cacheAPIURL, "file://") {
+		return cacheAPIURL, nil
+	}
+
 	req, err := http.NewRequest("POST", cacheAPIURL, bytes.NewReader([]byte(fmt.Sprintf(`{"file_size_in_bytes": %d}`, fileSizeInBytes))))
 	if err != nil {
 		return "", fmt.Errorf("Failed to create request: %s", err)
@@ -691,6 +621,11 @@ func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error
 }
 
 func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
+	if strings.HasPrefix(uploadURL, "file://") {
+		pth := strings.TrimPrefix(uploadURL, "file://")
+		return command.CopyFile(archiveFilePath, pth)
+	}
+
 	archFile, err := os.Open(archiveFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to open archive file for upload (%s): %s", archiveFilePath, err)
@@ -737,26 +672,30 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 func main() {
 	stepStartedAt := time.Now()
 
-	log.Infof("Configs:")
-	configs := createConfigsModelFromEnvs()
-	configs.print()
-
-	fmt.Println()
-
-	if err := configs.validate(); err != nil {
-		log.Errorf("Issue with input: %s", err)
+	configs, err := ParseConfig()
+	if err != nil {
+		log.Errorf(err.Error())
 		os.Exit(1)
 	}
 
-	cacheModel := NewCacheModel(configs)
+	configs.Print()
+	fmt.Println()
+
+	cacheModel := NewCacheModel(&configs)
 
 	// Cleaning paths
 	startTime := time.Now()
 	log.Infof("Cleaning paths")
-	if err := cacheModel.CleanPaths(); err != nil {
+	pathList, ignorePathList, indicatorHashMap, err := CleanPaths(cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator)
+	if err != nil {
 		log.Errorf("Failed to clean paths, error: %+v", err)
 		os.Exit(1)
 	}
+
+	cacheModel.PathList = pathList
+	cacheModel.IgnoreList = ignorePathList
+	cacheModel.IndicatorHashMap = indicatorHashMap
+
 	log.Printf("- Done")
 	log.Printf("- Took: %s", time.Now().Sub(startTime))
 	fmt.Println()
@@ -769,11 +708,12 @@ func main() {
 	// Check prev. cache
 	startTime = time.Now()
 	log.Infof("Checking previous cache status")
-	cacheInfoFileExists, err := cacheModel.LoadPreviousFilePathMap()
+	previousFilePathMap, cacheInfoFileExists, err := LoadPreviousFilePathMap()
 	if err != nil {
 		log.Errorf("Failed to load previous cache info file, error: %+v", err)
 		os.Exit(1)
 	}
+	cacheModel.PreviousFilePathMap = previousFilePathMap
 
 	if cacheInfoFileExists {
 		log.Printf("- Previous cache info found")
@@ -789,13 +729,14 @@ func main() {
 	if cacheInfoFileExists {
 		startTime = time.Now()
 		log.Infof("Checking for file changes")
-		currentFilePathsMap, err := cacheModel.GenerateCacheInfoMap()
+		filePathsMap, err := ProcessFiles(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, false, configs.DebugMode == "true")
 		if err != nil {
 			log.Errorf("Failed to generate files map, error: %+v", err)
 			os.Exit(1)
 		}
+		cacheModel.FilePathMap = filePathsMap
 
-		recacheRequired, err = cacheModel.CompareFilePathMaps(currentFilePathsMap)
+		recacheRequired, err = cacheModel.CompareFilePathMaps(filePathsMap)
 		if err != nil {
 			log.Errorf("Failed to compare file path maps, error: %+v", err)
 			os.Exit(1)
@@ -819,17 +760,23 @@ func main() {
 	// Generate cache archive
 	startTime = time.Now()
 	log.Infof("Generating cache archive")
-	if err := cacheModel.CreateTarArchive(); err != nil {
+	gzipWriter, tarWriter, tarFile, err := CreateTarArchive(cacheModel.CompressArchive)
+	if err != nil {
 		log.Errorf("Failed to create tar archive, error: %+v", err)
 		os.Exit(1)
 	}
+	cacheModel.GzipWriter = gzipWriter
+	cacheModel.TarWriter = tarWriter
+	cacheModel.TarFile = tarFile
 
-	if err := cacheModel.ProcessFiles(true); err != nil {
+	filePathMap, err := ProcessFiles(cacheModel.IndicatorHashMap, cacheModel.FilePathMap, cacheModel.PathList, cacheModel.IgnoreList, cacheModel.FileChangeIndicator, cacheModel.TarWriter, true, configs.DebugMode == "true")
+	if err != nil {
 		log.Errorf("Failed to process files, error: %+v", err)
 		os.Exit(1)
 	}
+	cacheModel.FilePathMap = filePathMap
 
-	if err := cacheModel.CloseTarArchive(); err != nil {
+	if err := CloseTarArchive(cacheModel.FilePathMap, cacheModel.TarWriter, cacheModel.GzipWriter, cacheModel.TarFile, cacheModel.CompressArchive); err != nil {
 		log.Errorf("Failed to close tar archive, error: %+v", err)
 		os.Exit(1)
 	}
@@ -840,7 +787,7 @@ func main() {
 	// Upload cache archive
 	startTime = time.Now()
 	log.Infof("Uploading cache archive")
-	if err := configs.uploadArchive(); err != nil {
+	if err := uploadArchive(configs.CacheAPIURL); err != nil {
 		log.Errorf("Failed to upload archive, error: %+v", err)
 		os.Exit(1)
 	}
