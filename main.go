@@ -397,136 +397,52 @@ func cleanDuplicatePaths(paths []string) []string {
 }
 
 // CleanPaths ...
-func CleanPaths(pathList, ignorePathList []string, indicator ChangeIndicator) ([]string, []string, map[string]string, error) {
-	indicatorHashMap := map[string]string{}
+func CleanPaths(pathList, ignorePathList []string, indicatorMethod ChangeIndicator) ([]string, []string, map[string]string, error) {
+	indicatorByPth := parseIncludeList(pathList)
+	var err error
+	indicatorByPth, err = normalizeIndicatorByPath(indicatorByPth)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cleanedPathList []string
-	var cleanedIgnoredPathList []string
+	indicatorHashMap := map[string]string{}
+	for pth, indicator := range indicatorByPth {
+		cleanedPathList = append(cleanedPathList, pth)
 
-	pathListWithoutDuplicates := cleanDuplicatePaths(pathList)
-
-	for _, path := range pathListWithoutDuplicates {
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
-		if strings.Contains(path, fileIndicatorSeparator) {
-			splittedPath := strings.Split(path, fileIndicatorSeparator)
-			cleanPath := strings.TrimSpace(splittedPath[0])
-			indicatorFilePath := strings.TrimSpace(splittedPath[1])
-
-			var err error
-			cleanPath, err = pathutil.ExpandTilde(cleanPath)
-			if err != nil {
-				log.Warnf("%s, ignoring...", err)
-				continue
-			}
-			indicatorFilePath, err = pathutil.ExpandTilde(indicatorFilePath)
-			if err != nil {
-				log.Warnf("%s, ignoring...", err)
-				continue
-			}
-
-			indicatorFileInfo, indicatorFilePathExists, err := pathutil.PathCheckAndInfos(indicatorFilePath)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			if !indicatorFilePathExists {
-				log.Warnf("Path ignored, indicator file (%s) doesn't exists: %s", indicatorFilePath, cleanPath)
-				continue
-			}
-			if indicatorFileInfo.IsDir() {
-				log.Warnf("Path ignored, indicator path is a directory: %s", cleanPath)
-				continue
-			}
-
-			pathExists, err := pathutil.IsPathExists(cleanPath)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			if !pathExists {
-				log.Warnf("Path ignored, does not exists: %s", cleanPath)
-				continue
-			}
-
-			cleanPath, err = filepath.Abs(cleanPath)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			indicatorFilePath, err = filepath.Abs(indicatorFilePath)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			indicatorFileChangeIndicator := ""
-
-			if indicator == MD5 {
-				indicatorFileChangeIndicator, err = getFileContentMD5(indicatorFilePath)
+		if len(indicator) > 0 {
+			var indicatorFileChangeIndicator string
+			if indicatorMethod == MD5 {
+				indicatorFileChangeIndicator, err = getFileContentMD5(indicator)
 				if err != nil {
 					return nil, nil, nil, err
 				}
-			} else if indicator == MODTIME {
-				fi, err := os.Stat(indicatorFilePath)
+			} else if indicatorMethod == MODTIME {
+				fi, err := os.Stat(indicator)
 				if err != nil {
 					return nil, nil, nil, err
 				}
 				indicatorFileChangeIndicator = fmt.Sprintf("%d", fi.ModTime().Unix())
 			}
 
-			cleanedPathList = append(cleanedPathList, cleanPath)
-			indicatorHashMap[cleanPath] = indicatorFileChangeIndicator
-		} else {
-			path = strings.TrimSpace(path)
-
-			pathExists, err := pathutil.IsPathExists(path)
-			if err != nil {
-				return nil, nil, nil, err
+			if len(indicatorFileChangeIndicator) > 0 {
+				indicatorHashMap[pth] = indicatorFileChangeIndicator
 			}
-			if !pathExists {
-				log.Warnf("Path ignored, does not exists: %s", path)
-				continue
-			}
-
-			path, err = filepath.Abs(path)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			cleanedPathList = append(cleanedPathList, path)
 		}
 	}
 
-	for _, path := range ignorePathList {
-		path = strings.TrimSpace(path)
-		if path == "" {
-			continue
+	excludeByPattern := parseIgnoreList(ignorePathList)
+	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var cleanedIgnoredPathList []string
+	for pattern, exclude := range excludeByPattern {
+		if exclude {
+			pattern = "!" + pattern
 		}
-
-		if strings.HasPrefix(path, "!") {
-			expandedPth, err := pathutil.ExpandTilde(strings.TrimPrefix(path, "!"))
-			if err != nil {
-				log.Warnf("%s, ignoring...", err)
-				continue
-			}
-
-			path = "!" + expandedPth
-		} else {
-			expandedPth, err := pathutil.ExpandTilde(path)
-			if err != nil {
-				log.Warnf("%s, ignoring...", err)
-				continue
-			}
-			path = expandedPth
-		}
-
-		if !strings.Contains(path, "*") {
-			var err error
-			path, err = filepath.Abs(path)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-		}
-
-		cleanedIgnoredPathList = append(cleanedIgnoredPathList, path)
+		cleanedIgnoredPathList = append(cleanedIgnoredPathList, pattern)
 	}
 
 	return cleanedPathList, cleanedIgnoredPathList, indicatorHashMap, nil
