@@ -10,6 +10,7 @@ import (
 	glob "github.com/ryanuber/go-glob"
 )
 
+// parseIncludeListItem separates path to cache and change indicator path.
 func parseIncludeListItem(item string) (string, string) {
 	// file/or/dir/to/cache -> indicator/file
 	// file/or/dir/to/cache
@@ -30,6 +31,7 @@ func parseIncludeListItem(item string) (string, string) {
 	return strings.TrimSpace(pth), strings.TrimSpace(indicator)
 }
 
+// parseIgnoreListItem separates ignore pattern and if pattern match removes item from cache or not.
 func parseIgnoreListItem(item string) (string, bool) {
 	// path/or/patter/to/exclude
 	// !path/or/patter/to/exclude
@@ -75,13 +77,15 @@ func parseIgnoreList(list []string) map[string]bool {
 	return ignoreByPath
 }
 
+// expandPath returns every file included in pth (recursively) if it is a dir,
+// if pth is a file it will be returned as an array.
 func expandPath(pth string) ([]string, error) {
 	info, err := os.Lstat(pth)
 	if err != nil {
 		return nil, err
 	}
 
-	var includeSubPaths []string
+	var subPaths []string
 	if info.IsDir() {
 		if err := filepath.Walk(pth, func(p string, i os.FileInfo, err error) error {
 			if err != nil {
@@ -91,18 +95,22 @@ func expandPath(pth string) ([]string, error) {
 				return nil
 			}
 
-			includeSubPaths = append(includeSubPaths, p)
+			subPaths = append(subPaths, p)
 			return nil
 		}); err != nil {
 			return nil, err
 		}
 	} else {
-		includeSubPaths = append(includeSubPaths, pth)
+		subPaths = append(subPaths, pth)
 	}
 
-	return includeSubPaths, nil
+	return subPaths, nil
 }
 
+// normalizeIndicatorByPath modifies indicatorByPath:
+// expands both path to cache and indicator path
+// removes the item if any of path to cache or indicator path is not exist or if the indicator is a dir
+// replaces path to cache (if it is a directory) by every file (recursively) in the directory.
 func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]string, error) {
 	normalized := map[string]string{}
 	for pth, indicator := range indicatorByPath {
@@ -152,6 +160,8 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 	return normalized, nil
 }
 
+// normalizeExcludeByPattern modifies excludeByPattern:
+// expands patterns.
 func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]bool, error) {
 	normalized := map[string]bool{}
 	for pattern, exclude := range excludeByPattern {
@@ -165,6 +175,8 @@ func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]boo
 	return normalized, nil
 }
 
+// match reports whether the path matches to any of the given ignore items
+// and returns the exclude property of the matching ignore item.
 func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 	for pattern, exclude := range excludeByPattern {
 		if strings.Contains(pattern, "*") && glob.Glob(pattern, pth) {
@@ -178,6 +190,12 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 	return false, false
 }
 
+// interleave matches the given include items with the ignore items and returns which path needs to be cached:
+// if an ignore item matches to a path, the path either will not affect the previous cache invalidation
+// or will not be included in the cache.
+// Otherwise a path will affect the previous cache invalidation:
+// if the path has indicator, the indicator will affect the previous cache invalidation
+// otherwise the file itself.
 func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) (map[string]string, error) {
 	indicatorByCahcePth := map[string]string{}
 
