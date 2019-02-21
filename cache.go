@@ -177,13 +177,13 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
-		doNotTrack, exclude := match(pth, excludeByPattern)
+		skip, exclude := match(pth, excludeByPattern)
 		if exclude {
 			// this file should not be included in the cache
 			continue
 		}
 
-		if doNotTrack {
+		if skip {
 			// this file's changes does not fluctuates existing cache invalidation
 			indicator = ""
 		} else if len(indicator) == 0 {
