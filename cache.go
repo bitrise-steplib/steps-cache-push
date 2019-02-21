@@ -14,21 +14,10 @@ import (
 func parseIncludeListItem(item string) (string, string) {
 	// file/or/dir/to/cache -> indicator/file
 	// file/or/dir/to/cache
-	i := strings.Index(item, "->")
-	if i == -1 {
-		return strings.TrimSpace(item), ""
+	if parts := strings.Split(item, "->"); len(parts) > 1 {
+		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 	}
-	var pth string
-	if i > 0 {
-		pth = item[:i]
-	}
-
-	var indicator string
-	if i+2 < len(item) {
-		indicator = item[i+2:]
-	}
-
-	return strings.TrimSpace(pth), strings.TrimSpace(indicator)
+	return strings.TrimSpace(item), ""
 }
 
 // parseIgnoreListItem separates ignore pattern and if pattern match removes item from cache or not.
@@ -36,21 +25,10 @@ func parseIgnoreListItem(item string) (string, bool) {
 	// path/or/patter/to/exclude
 	// !path/or/patter/to/exclude
 	item = strings.TrimSpace(item)
-	if len(item) == 0 {
-		return "", false
+	if len(item) > 1 && item[0] == '!' {
+		return strings.TrimSpace(item[1:]), true
 	}
-
-	ignore := false
-	if strings.HasPrefix(item, "!") {
-		ignore = true
-		item = strings.TrimPrefix(item, "!")
-		item = strings.TrimSpace(item)
-		if len(item) == 0 {
-			return "", false
-		}
-	}
-
-	return item, ignore
+	return strings.TrimPrefix(item, "!"), false
 }
 
 func parseIncludeList(list []string) map[string]string {
@@ -85,23 +63,23 @@ func expandPath(pth string) ([]string, error) {
 		return nil, err
 	}
 
-	var subPaths []string
-	if info.IsDir() {
-		if err := filepath.Walk(pth, func(p string, i os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if i.IsDir() {
-				return nil
-			}
+	if !info.IsDir() {
+		return []string{pth}, nil
+	}
 
-			subPaths = append(subPaths, p)
-			return nil
-		}); err != nil {
-			return nil, err
+	var subPaths []string
+	if err := filepath.Walk(pth, func(p string, i os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
-	} else {
-		subPaths = append(subPaths, pth)
+		if i.IsDir() {
+			return nil
+		}
+
+		subPaths = append(subPaths, p)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return subPaths, nil
@@ -121,8 +99,7 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 				return nil, err
 			}
 
-			info, exist, err := pathutil.PathCheckAndInfos(indicator)
-			switch {
+			switch info, exist, err := pathutil.PathCheckAndInfos(indicator); {
 			case err != nil:
 				return nil, err
 			case !exist:
@@ -197,7 +174,7 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 // if the path has indicator, the indicator will affect the previous cache invalidation
 // otherwise the file itself.
 func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) (map[string]string, error) {
-	indicatorByCahcePth := map[string]string{}
+	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
 		doNotTrack, exclude := match(pth, excludeByPattern)
@@ -216,8 +193,8 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 			// the file's indicator content fluctuates existing cache invalidation
 		}
 
-		indicatorByCahcePth[pth] = indicator
+		indicatorByCachePth[pth] = indicator
 	}
 
-	return indicatorByCahcePth, nil
+	return indicatorByCachePth, nil
 }
