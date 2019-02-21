@@ -58,15 +58,6 @@ func parseIgnoreList(list []string) map[string]bool {
 // expandPath returns every file included in pth (recursively) if it is a dir,
 // if pth is a file it will be returned as an array.
 func expandPath(pth string) ([]string, error) {
-	info, err := os.Lstat(pth)
-	if err != nil {
-		return nil, err
-	}
-
-	if !info.IsDir() {
-		return []string{pth}, nil
-	}
-
 	var subPaths []string
 	if err := filepath.Walk(pth, func(p string, i os.FileInfo, err error) error {
 		if err != nil {
