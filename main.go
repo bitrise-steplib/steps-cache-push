@@ -1,3 +1,12 @@
+// Cache Push step keeps the project's cache in sync with the project's current state based on the defined files to be cached and ignored.
+//
+// Files to be cached are described by a path and an optional descriptor file path.
+// Files to be cached can be referred by direct file path while multiple files can be selected by referring the container directory.
+// Optional indicator represents a files, based on which the step synchronizes the given file(s).
+// Syntax: file/path/to/cache, dir/to/cache, file/path/to/cache -> based/on/this/file, dir/to/cache -> based/on/this/file
+//
+// Ignore items are used to ignore certain file(s) from a directory to be cached or to mark that certain file(s) not relevant in cache synchronization.
+// Syntax: not/relevant/file/or/pattern, !file/or/pattern/to/remove/from/cache
 package main
 
 import (
