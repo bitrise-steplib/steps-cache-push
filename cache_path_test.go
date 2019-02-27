@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/bitrise-io/go-utils/fileutil"
+
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
@@ -221,14 +223,14 @@ func Test_parseIgnoreList(t *testing.T) {
 	}
 }
 
-func createDirStruct(t *testing.T, pths []string) {
-	for _, pth := range pths {
+func createDirStruct(t *testing.T, contentByPth map[string]string) {
+	for pth, content := range contentByPth {
 		dir := filepath.Dir(pth)
 		if err := os.MkdirAll(dir, 0777); err != nil {
 			t.Fatalf("failed to create dir: %s", err)
 			return
 		}
-		if _, err := os.Create(pth); err != nil {
+		if err := fileutil.WriteStringToFile(pth, content); err != nil {
 			t.Fatalf("failed to create file: %s", err)
 			return
 		}
@@ -242,9 +244,9 @@ func Test_expandPath(t *testing.T) {
 		return
 	}
 
-	pths := []string{
-		filepath.Join(tmpDir, "subdir", "file1"),
-		filepath.Join(tmpDir, "subdir", "file2"),
+	pths := map[string]string{
+		filepath.Join(tmpDir, "subdir", "file1"): "",
+		filepath.Join(tmpDir, "subdir", "file2"): "",
 	}
 	createDirStruct(t, pths)
 
@@ -288,9 +290,9 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 		return
 	}
 
-	pths := []string{
-		filepath.Join(tmpDir, "subdir", "file1"),
-		filepath.Join(tmpDir, "subdir", "file2"),
+	pths := map[string]string{
+		filepath.Join(tmpDir, "subdir", "file1"): "",
+		filepath.Join(tmpDir, "subdir", "file2"): "",
 	}
 	createDirStruct(t, pths)
 
