@@ -231,7 +231,7 @@ func createDirStruct(t *testing.T, contentByPth map[string]string) {
 			return
 		}
 		if err := fileutil.WriteStringToFile(pth, content); err != nil {
-			t.Fatalf("failed to create file: %s", err)
+			t.Fatalf("failed to write file: %s", err)
 			return
 		}
 	}

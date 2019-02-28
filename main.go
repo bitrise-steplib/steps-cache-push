@@ -577,11 +577,6 @@ func main() {
 		cacheModel.FilePathMap = filePathsMap
 
 		recacheRequired = CompareFilePathMaps(cacheModel.PreviousFilePathMap, filePathsMap, cacheModel.DebugMode)
-		if err != nil {
-			log.Errorf("Failed to compare file path maps, error: %+v", err)
-			os.Exit(1)
-		}
-
 		if recacheRequired {
 			log.Printf("- File changes found")
 			log.Printf("- Done")
