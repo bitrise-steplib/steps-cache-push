@@ -1,3 +1,4 @@
+// Cache path and ignore path related functions.
 package main
 
 import (
