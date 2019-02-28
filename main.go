@@ -1,27 +1,32 @@
+// Cache Push step keeps the project's cache in sync with the project's current state based on the defined files to be cached and ignored.
+//
+// Files to be cached are described by a path and an optional descriptor file path.
+// Files to be cached can be referred by direct file path while multiple files can be selected by referring the container directory.
+// Optional indicator represents a files, based on which the step synchronizes the given file(s).
+// Syntax: file/path/to/cache, dir/to/cache, file/path/to/cache -> based/on/this/file, dir/to/cache -> based/on/this/file
+//
+// Ignore items are used to ignore certain file(s) from a directory to be cached or to mark that certain file(s) not relevant in cache synchronization.
+// Syntax: not/relevant/file/or/pattern, !file/or/pattern/to/remove/from/cache
 package main
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
-	"github.com/bitrise-io/go-utils/sliceutil"
 	glob "github.com/ryanuber/go-glob"
 )
 
@@ -212,7 +217,7 @@ func ProcessFiles(indicatorHashMap, filePathMap map[string]string, pathList, ign
 					switch storeMode {
 					case STORE:
 						if indicator == MD5 {
-							fileMD5, err := getFileContentMD5(path)
+							fileMD5, err := fileContentHash(path)
 							if err != nil {
 								return err
 							}
@@ -311,89 +316,32 @@ func LoadPreviousFilePathMap() (map[string]string, bool, error) {
 }
 
 // CompareFilePathMaps ...
-func (cacheModel *CacheModel) CompareFilePathMaps(currentFilePathsMap map[string]string) (bool, error) {
-	triggerNewCache := false
-	logLineCount := 0
-
-	for prevKey, prevValue := range cacheModel.PreviousFilePathMap {
-		currentValue, ok := currentFilePathsMap[prevKey]
-		if !ok {
-			log.Warnf("REMOVED: %s", prevKey)
-			if prevValue == "-" {
-				log.Donef("- Ignored")
-				if !cacheModel.DebugMode {
-					if logLineCount >= 9 {
-						log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
-						return true, nil
-					}
-				}
-				logLineCount++
-			} else {
-				triggerNewCache = true
-				if !cacheModel.DebugMode {
-					if logLineCount >= 9 {
-						log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
-						return true, nil
-					}
-				}
-				logLineCount++
+func CompareFilePathMaps(previousFilePathMap, currentFilePathsMap map[string]string, debugMode bool) bool {
+	logDebugPaths := func(paths []string) {
+		if debugMode {
+			for _, pth := range paths {
+				log.Debugf("- %s", pth)
 			}
-		} else {
-			if currentValue != prevValue {
-				log.Warnf("CHANGED: %s, Current: %s != Previous: %s", prevKey, currentValue, prevValue)
-				triggerNewCache = true
-				if !cacheModel.DebugMode {
-					if logLineCount >= 9 {
-						log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
-						return true, nil
-					}
-				}
-				logLineCount++
-			}
-		}
-		delete(cacheModel.PreviousFilePathMap, prevKey)
-		delete(currentFilePathsMap, prevKey)
-	}
-
-	for remainingKey, remainingValue := range currentFilePathsMap {
-		log.Warnf("ADDED: %s", remainingKey)
-		if remainingValue == "-" {
-			log.Donef("- Ignored")
-			if !cacheModel.DebugMode {
-				if logLineCount >= 9 {
-					log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
-					return true, nil
-				}
-			}
-			logLineCount++
-		} else {
-			triggerNewCache = true
-			if !cacheModel.DebugMode {
-				if logLineCount >= 9 {
-					log.Printf("[List truncated, turn on DebugMode to see the whole change list]")
-					return true, nil
-				}
-			}
-			logLineCount++
 		}
 	}
 
-	return triggerNewCache, nil
-}
+	result := compare(previousFilePathMap, currentFilePathsMap)
 
-func cleanDuplicatePaths(paths []string) []string {
-	cleanedPaths := []string{}
-	for _, item := range paths {
-		if item == "" {
-			continue
-		}
-		cleanPath := path.Clean(item)
-		if !sliceutil.IsStringInSlice(cleanPath, cleanedPaths) {
-			cleanedPaths = append(cleanedPaths, cleanPath)
-		}
-	}
+	log.Warnf("Previous cache is invalid, new cache will be generated:")
+	log.Warnf("%d files needs to be removed", len(result.removed))
+	logDebugPaths(result.removed)
+	log.Warnf("%d files has changed", len(result.changed))
+	logDebugPaths(result.changed)
+	log.Warnf("%d files added", len(result.added))
+	logDebugPaths(result.added)
+	log.Debugf("%d ignored files removed", len(result.removedIgnored))
+	logDebugPaths(result.removedIgnored)
+	log.Debugf("%d files did not change", len(result.matching))
+	logDebugPaths(result.matching)
+	log.Debugf("%d ignored files added", len(result.addedIgnored))
+	logDebugPaths(result.addedIgnored)
 
-	return cleanedPaths
+	return result.triggerNewCache()
 }
 
 // CleanPaths ...
@@ -413,7 +361,7 @@ func CleanPaths(pathList, ignorePathList []string, indicatorMethod ChangeIndicat
 		if len(indicator) > 0 {
 			var indicatorFileChangeIndicator string
 			if indicatorMethod == MD5 {
-				indicatorFileChangeIndicator, err = getFileContentMD5(indicator)
+				indicatorFileChangeIndicator, err = fileContentHash(indicator)
 				if err != nil {
 					return nil, nil, nil, err
 				}
@@ -469,30 +417,6 @@ func uploadArchive(cacheAPIURL string) error {
 		return tryToUploadArchive(uploadURL, cacheArchivePath)
 	}
 	return nil
-}
-
-func getFileContentMD5(filePath string) (string, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Errorf("Failed to close file (%s), error: %+v", filePath, err)
-		}
-	}()
-
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
-}
-
-func timespecToTime(ts syscall.Timespec) time.Time {
-	return time.Unix(int64(ts.Sec), int64(ts.Nsec))
 }
 
 func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
@@ -652,12 +576,7 @@ func main() {
 		}
 		cacheModel.FilePathMap = filePathsMap
 
-		recacheRequired, err = cacheModel.CompareFilePathMaps(filePathsMap)
-		if err != nil {
-			log.Errorf("Failed to compare file path maps, error: %+v", err)
-			os.Exit(1)
-		}
-
+		recacheRequired = CompareFilePathMaps(cacheModel.PreviousFilePathMap, filePathsMap, cacheModel.DebugMode)
 		if recacheRequired {
 			log.Printf("- File changes found")
 			log.Printf("- Done")
