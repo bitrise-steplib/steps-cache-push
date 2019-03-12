@@ -155,7 +155,7 @@ func main() {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
 
-	if err := archive.WriteHeader(curDescriptor); err != nil {
+	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
 		logErrorfAndExit("Failed to write archive header: %s", err)
 	}
 
