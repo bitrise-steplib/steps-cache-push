@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -192,7 +193,7 @@ func Test_compare(t *testing.T) {
 	}
 }
 
-func Test_result_triggerNewCache(t *testing.T) {
+func Test_result_hasChanges(t *testing.T) {
 	type fields struct {
 		removedIgnored []string
 		removed        []string
@@ -268,8 +269,66 @@ func Test_result_triggerNewCache(t *testing.T) {
 				addedIgnored:   tt.addedIgnored,
 				added:          tt.added,
 			}
-			if got := r.triggerNewCache(); got != tt.triggerNewCache {
+			if got := r.hasChanges(); got != tt.triggerNewCache {
 				t.Errorf("result.triggerNewCache() = %v, want %v", got, tt.triggerNewCache)
+			}
+		})
+	}
+}
+
+func Test_readCacheDescriptor(t *testing.T) {
+	desired := map[string]string{
+		"pacth/to/cache": "indicator",
+	}
+
+	content, err := json.Marshal(desired)
+	if err != nil {
+		t.Fatalf("Failed to create descriptor: %s", err)
+	}
+
+	tmpDir, err := pathutil.NormalizedOSTempDirPath("cache")
+	if err != nil {
+		t.Fatalf("failed to create tmp dir: %s", err)
+		return
+	}
+	pth := filepath.Join(tmpDir, "descriptor")
+
+	createDirStruct(t, map[string]string{pth: string(content)})
+
+	tests := []struct {
+		name       string
+		pth        string
+		descriptor map[string]string
+		wantErr    bool
+	}{
+		{
+			name:       "No path provided",
+			pth:        "",
+			descriptor: nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Not existing path",
+			pth:        "/not/existing/path",
+			descriptor: nil,
+			wantErr:    false,
+		},
+		{
+			name:       "Existing descriptor",
+			pth:        pth,
+			descriptor: desired,
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			descriptor, err := readCacheDescriptor(tt.pth)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readCacheDescriptor() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(descriptor, tt.descriptor) {
+				t.Errorf("readCacheDescriptor() descriptor = %v, want %v", descriptor, tt.descriptor)
 			}
 		})
 	}
