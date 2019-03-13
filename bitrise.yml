@@ -49,6 +49,18 @@ workflows:
         - cache_paths: $CACHE_PATH
         - ignore_check_on_paths: $IGNORE_PATH
     - script:
+        title: Extract cache
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            
+            # remove TMP_DIR to cleanup test_ignorechanges.txt file
+            rm -rf $TMP_DIR
+            # extract the archive to get the archived test_ignorechanges.txt file
+            tar -xPf /tmp/cache-archive.tar
+    - script:
         title: Current version
         run_if: true
         inputs:
