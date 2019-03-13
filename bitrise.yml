@@ -56,8 +56,6 @@ workflows:
             #!/bin/bash
             set -ex
             
-            # remove TMP_DIR to cleanup test_ignorechanges.txt file
-            rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
             tar -xPf /tmp/cache-archive.tar -C $TMP_DIR/prev_cache
 
