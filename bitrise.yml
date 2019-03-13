@@ -59,12 +59,16 @@ workflows:
             # remove TMP_DIR to cleanup test_ignorechanges.txt file
             rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
-            tar -xPf /tmp/cache-archive.tar
+            tar -xPf /tmp/cache-archive.tar -C $TMP_DIR/prev_cache
+
+            mv "$TMP_DIR/prev_cache/tmp/cache-info.json" "/tmp/cache-info_orig.json"
+
+            rm -rf $TMP_DIR/prev_cache
     - script:
         title: Current version
         run_if: true
         inputs:
-        - content: mv "/tmp/cache-info.json" "/tmp/cache-info_orig.json"
+        - content:
     - path::./:
         title: Current version
         run_if: true
