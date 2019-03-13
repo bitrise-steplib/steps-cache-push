@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -205,6 +206,10 @@ func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error
 func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	if strings.HasPrefix(uploadURL, "file://") {
 		pth := strings.TrimPrefix(uploadURL, "file://")
+		dir := filepath.Dir(pth)
+		if err := os.MkdirAll(dir, 0777); err != nil {
+			return err
+		}
 		return command.CopyFile(archiveFilePath, pth)
 	}
 

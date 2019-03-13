@@ -40,6 +40,10 @@ func main() {
 	configs.Print()
 	fmt.Println()
 
+	if configs.CacheDescriptorPath == "" {
+		configs.CacheDescriptorPath = cacheInfoFilePath
+	}
+
 	// Cleaning paths
 	startTime := time.Now()
 
@@ -79,7 +83,7 @@ func main() {
 
 	log.Infof("Checking previous cache status")
 
-	prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
+	prevDescriptor, err := readCacheDescriptor(configs.CacheDescriptorPath)
 	if err != nil {
 		logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
 	}
@@ -155,7 +159,7 @@ func main() {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
 
-	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
+	if err := archive.WriteHeader(curDescriptor, configs.CacheDescriptorPath); err != nil {
 		logErrorfAndExit("Failed to write archive header: %s", err)
 	}
 
