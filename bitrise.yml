@@ -55,8 +55,9 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # extract the archive to get the archived test_ignorechanges.txt file
+            mkdir $TMP_DIR/prev_cache
             tar -xPf /tmp/cache-archive.tar -C $TMP_DIR/prev_cache
 
             mv "$TMP_DIR/prev_cache/tmp/cache-info.json" "/tmp/cache-info_orig.json"
