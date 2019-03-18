@@ -14,7 +14,7 @@ workflows:
     after_run:
     - smoke_test
     - ignore_path_test
-    - backwared_compatible_test
+    # - backwared_compatible_test
     steps:
     - go-list:
     - golint:
