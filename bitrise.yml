@@ -83,6 +83,9 @@ workflows:
             #!/bin/bash
             set -ex
 
+            # extract the archive to get the in-progress version's cache descriptor file
+            tar -xPf /tmp/cache-archive.tar
+
             # check if the current stable step version's cache descriptor file is identical to the
             # in-progress step version's cache descriptor file
             if [ "$(cat /tmp/cache-info_orig.json)" != "$(cat /tmp/cache-info.json)" ] ; then
