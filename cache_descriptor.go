@@ -18,9 +18,9 @@ type ChangeIndicator string
 
 const (
 	// MD5 ...
-	MD5 = ChangeIndicator("file-mod-time")
+	MD5 = ChangeIndicator("file-content-hash")
 	// MODTIME ...
-	MODTIME = ChangeIndicator("file-content-hash")
+	MODTIME = ChangeIndicator("file-mod-time")
 )
 
 // result stores how the keys are different in two cache descriptor.
