@@ -11,22 +11,22 @@ app:
 workflows:
   backwared_compatible_test:
     description: |
-      Test to make sure the cache descriptor file's format is not changing.
+      Tests if the cache descriptor file is not changed compared to the previous stable step version.
     envs:
     - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp3
     - CACHE_PATH: |
         $BITRISE_CACHE_DIR
-        ../_sample_artifacts/filestructure -> ../_sample_artifacts/filestructure/build/findme.test
+        ./_sample_artifacts/filestructure -> ./_sample_artifacts/filestructure/build/findme.test
         ./DoesNotExist/
         ./DoesNotExist
         ~/DoesNotExist
         /Does/not/exists
         ~/.android -> ~/.lockfile
-        ../_sample_artifacts/ipas
-        ../_sample_artifacts/ipas/
-        ../_sample_artifacts/filestructure/build/test.bin
+        ./_sample_artifacts/ipas
+        ./_sample_artifacts/ipas/
+        ./_sample_artifacts/filestructure/build/test.bin
     - IGNORE_PATH: |-
-        ../_sample_artifacts/filestructure/sub-dir
+        ./_sample_artifacts/filestructure/sub-dir
         ~/DoesNotExists/This
         !~/.android/dir
         *.apk
@@ -40,6 +40,10 @@ workflows:
         inputs:
         - path: $TMP_DIR
         - is_create_path: true
+    - script:
+        title: Download assets
+        inputs:
+        - content: git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
     - cache-push:
         title: Latest released version
         run_if: true
@@ -49,27 +53,22 @@ workflows:
         - cache_paths: $CACHE_PATH
         - ignore_check_on_paths: $IGNORE_PATH
     - script:
-        title: Extract cache
+        title: Extract cache and save the cache descriptor
         is_always_run: true
         inputs:
         - content: |-
             #!/bin/bash
             set -ex
 
-            # extract the archive to get the archived test_ignorechanges.txt file
-            mkdir $TMP_DIR/prev_cache
-            tar -xPf /tmp/cache-archive.tar -C $TMP_DIR/prev_cache
+            # extract the archive to get the current stable step version's cache descriptor file
+            tar -xPf /tmp/cache-archive.tar
+            mv "/tmp/cache-info.json" "/tmp/cache-info_orig.json"
 
-            mv "$TMP_DIR/prev_cache/tmp/cache-info.json" "/tmp/cache-info_orig.json"
-
-            rm -rf $TMP_DIR/prev_cache
-    - script:
-        title: Current version
-        run_if: true
-        inputs:
-        - content:
+            # restore the workdir for the in-progress step version
+            rm -rf $TMP_DIR/*
+            git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
     - path::./:
-        title: Current version
+        title: in-progress version
         run_if: true
         is_skippable: false
         inputs:
@@ -77,15 +76,21 @@ workflows:
         - cache_paths: $CACHE_PATH
         - ignore_check_on_paths: $IGNORE_PATH
     - script:
-        title: Current version
+        title: Compare cache descriptors
         run_if: true
         inputs:
         - content: |-
             #!/bin/bash
             set -ex
 
-            if [ "$(cat /tmp/cache-info_orig.json)" != "$(cat /tmp/cache-info_orig.json)" ] ; then
+            # check if the current stable step version's cache descriptor file is identical to the
+            # in-progress step version's cache descriptor file
+            if [ "$(cat /tmp/cache-info_orig.json)" != "$(cat /tmp/cache-info.json)" ] ; then
                 echo "Cache descriptor file changed"
+
+                cp "/tmp/cache-info.json" "$BITRISE_DEPLOY_DIR/cache-info.json"
+                cp "/tmp/cache-info_orig.json" "$BITRISE_DEPLOY_DIR/cache-info_orig.json"
+
                 exit 1
             fi
 
@@ -140,9 +145,9 @@ workflows:
 
   ignore_path_test:
     description: |
-      Tests if ignored file's change does not triggers new cache generation,
-      so the ignored file should remain as it was originally, even if it gets modified
-      betweeen two cache push step run.
+      Tests if ignored file's change does not triggers new cache creation.
+      An ignored file (in the cache archive) should remain as it was originally, 
+      even if it gets modified (locally) betweeen two cache push step runs.
     envs:
     - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp2
     - CACHE_PATH: |
@@ -168,13 +173,13 @@ workflows:
             #!/bin/bash
             set -ex
 
-            #should follow changes
+            # should follow changes
             echo "content" > $TMP_DIR/test_file1.txt
 
-            #should not exists
+            # should not exists
             echo "content" > $TMP_DIR/test_exclude_ext.mp3
 
-            #should exists but ignore changes
+            # should exists but ignore changes
             echo "content" > $TMP_DIR/test_ignorechanges.txt
     - path::./:
         title: Step Test
@@ -187,7 +192,7 @@ workflows:
         - cache_paths: $CACHE_PATH
         - ignore_check_on_paths: $IGNORE_PATH
     - script:
-        title: Store MD5 hash and check if file doesn't exists
+        title: Store MD5 hash of an ignored file and modify it
         is_always_run: true
         inputs:
         - content: |-
@@ -200,8 +205,8 @@ workflows:
             tar -xPf /tmp/cache-archive.tar
 
             # export the MD5 hash of test_ignorechanges.txt file
-            # this file's content should remain as it is even if it gets modified
-            # since this files if in ignore list and no other files changed
+            # this file's content should remain as it is (in the archive) even if it gets modified
+            # since this files is in ignore list and no other files changed
             envman add --key MD5PREVIOUSLY --value $(md5 -q $TMP_DIR/test_ignorechanges.txt)
 
             # following cache should not update the archive even if this file changes
