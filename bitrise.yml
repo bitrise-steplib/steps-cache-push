@@ -5,10 +5,27 @@ app:
   envs:
   # define these in your .bitrise.secrets.yml
   - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL # use file url scheme (file://) to create a cache archive in a local directory
-  - BITRISE_CACHE_INFO_PATH: $BITRISE_CACHE_INFO_PATH
   - ORIG_BITRISE_SOURCE_DIR: $BITRISE_SOURCE_DIR
 
 workflows:
+  test:
+    before_run:
+    - audit-this-step
+    after_run:
+    - smoke_test
+    - ignore_path_test
+    - backwared_compatible_test
+    steps:
+    - go-list:
+    - golint:
+    - errcheck:
+    - go-test:
+    - codecov:
+        run_if: .IsCI
+        inputs:
+        - other_options: -f ${GO_CODE_COVERAGE_REPORT_PATH}
+        - CODECOV_TOKEN: "$CODECOV_UPLOAD_TOKEN"
+
   backwared_compatible_test:
     description: |
       Tests if the cache descriptor file is not changed compared to the previous stable step version.
@@ -255,24 +272,6 @@ workflows:
               echo "File exists."
               exit 1
             fi
-
-  test:
-    before_run:
-    - audit-this-step
-    after_run:
-    - smoke_test
-    - ignore_path_test
-    - backwared_compatible_test
-    steps:
-    - go-list:
-    - golint:
-    - errcheck:
-    - go-test:
-    - codecov:
-        run_if: .IsCI
-        inputs:
-        - other_options: -f ${GO_CODE_COVERAGE_REPORT_PATH}
-        - CODECOV_TOKEN: "$CODECOV_UPLOAD_TOKEN"
 
   # ----------------------------------------------------------------
   # --- Utility workflows

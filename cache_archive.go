@@ -98,7 +98,7 @@ func (a *Archive) Write(pths []string) error {
 
 // WriteHeader writes the cache descriptor file into the archive as a tar header.
 func (a *Archive) WriteHeader(descriptor map[string]string, descriptorPth string) error {
-	b, err := json.Marshal(descriptor)
+	b, err := json.MarshalIndent(descriptor, "", " ")
 	if err != nil {
 		return err
 	}
