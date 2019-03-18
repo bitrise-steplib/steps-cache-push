@@ -33,8 +33,7 @@ func main() {
 
 	configs, err := ParseConfig()
 	if err != nil {
-		log.Errorf(err.Error())
-		os.Exit(1)
+		logErrorfAndExit(err.Error())
 	}
 
 	configs.Print()

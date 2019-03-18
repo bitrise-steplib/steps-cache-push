@@ -15,7 +15,7 @@ import (
 func createDirStruct(t *testing.T, contentByPth map[string]string) {
 	for pth, content := range contentByPth {
 		dir := filepath.Dir(pth)
-		if err := os.MkdirAll(dir, 0777); err != nil {
+		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatalf("failed to create dir: %s", err)
 			return
 		}

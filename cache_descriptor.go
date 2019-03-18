@@ -129,11 +129,9 @@ func fileModtime(pth string) (string, error) {
 
 // readCacheDescriptor reads cache descriptor from pth is exists.
 func readCacheDescriptor(pth string) (map[string]string, error) {
-	exists, err := pathutil.IsPathExists(pth)
-	if err != nil {
+	if exists, err := pathutil.IsPathExists(pth); err != nil {
 		return nil, err
-	}
-	if !exists {
+	} else if !exists {
 		return nil, nil
 	}
 

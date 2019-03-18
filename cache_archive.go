@@ -140,6 +140,15 @@ func (a *Archive) Close() error {
 // If the destination is a local file path (url has a file:// scheme) this function copies the cache archive file to the destination.
 // Otherwise destination should point to the Bitrise cache API server, in this case the function has builtin retry logic with 3s sleep.
 func uploadArchive(pth, url string) error {
+	if strings.HasPrefix(url, "file://") {
+		dst := strings.TrimPrefix(url, "file://")
+		dir := filepath.Dir(dst)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		return command.CopyFile(pth, dst)
+	}
+
 	fi, err := os.Stat(pth)
 	if err != nil {
 		return fmt.Errorf("failed to get file info (%s): %s", pth, err)
@@ -164,11 +173,7 @@ func uploadArchive(pth, url string) error {
 
 // getCacheUploadURL requests an upload url from the Bitrise cache API server.
 func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error) {
-	if strings.HasPrefix(cacheAPIURL, "file://") {
-		return cacheAPIURL, nil
-	}
-
-	req, err := http.NewRequest("POST", cacheAPIURL, bytes.NewReader([]byte(fmt.Sprintf(`{"file_size_in_bytes": %d}`, fileSizeInBytes))))
+	req, err := http.NewRequest(http.MethodPost, cacheAPIURL, bytes.NewReader([]byte(fmt.Sprintf(`{"file_size_in_bytes": %d}`, fileSizeInBytes))))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %s", err)
 	}
@@ -204,15 +209,6 @@ func getCacheUploadURL(cacheAPIURL string, fileSizeInBytes int64) (string, error
 // If the destination is a local file path (url has a file:// scheme) this function copies the cache archive file to the destination.
 // Otherwise destination should be a remote url.
 func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
-	if strings.HasPrefix(uploadURL, "file://") {
-		pth := strings.TrimPrefix(uploadURL, "file://")
-		dir := filepath.Dir(pth)
-		if err := os.MkdirAll(dir, 0777); err != nil {
-			return err
-		}
-		return command.CopyFile(archiveFilePath, pth)
-	}
-
 	archFile, err := os.Open(archiveFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open archive file for upload (%s): %s", archiveFilePath, err)
@@ -234,7 +230,7 @@ func tryToUploadArchive(uploadURL string, archiveFilePath string) error {
 	}
 	fileSize := fileInfo.Size()
 
-	req, err := http.NewRequest("PUT", uploadURL, archFile)
+	req, err := http.NewRequest(http.MethodPut, uploadURL, archFile)
 	if err != nil {
 		return fmt.Errorf("failed to create upload request: %s", err)
 	}
