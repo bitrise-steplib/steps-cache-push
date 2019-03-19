@@ -4,13 +4,17 @@ default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 app:
   envs:
   # define these in your .bitrise.secrets.yml
-  - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL
-  - BITRISE_CACHE_INFO_PATH: $BITRISE_CACHE_INFO_PATH
+  - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL # use file url scheme (file://) to create a cache archive in a local directory
+  - ORIG_BITRISE_SOURCE_DIR: $BITRISE_SOURCE_DIR
 
 workflows:
   test:
     before_run:
     - audit-this-step
+    after_run:
+    - smoke_test
+    - ignore_path_test
+    # - backwared_compatible_test
     steps:
     - go-list:
     - golint:
@@ -21,35 +25,120 @@ workflows:
         inputs:
         - other_options: -f ${GO_CODE_COVERAGE_REPORT_PATH}
         - CODECOV_TOKEN: "$CODECOV_UPLOAD_TOKEN"
-    - change-workdir:
-        title: Switch working dir to test / _tmp dir
-        description: |-
-          To prevent step testing issues, like referencing relative
-          files with just './some-file' in the step's code, which would
-          work for testing the step from this directory directly
-          but would break if the step is included in another `bitrise.yml`.
-        run_if: true
+
+  backwared_compatible_test:
+    description: |
+      Tests if the cache descriptor file is not changed compared to the previous stable step version.
+    envs:
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp3
+    - CACHE_PATH: |
+        $BITRISE_CACHE_DIR
+        ./_sample_artifacts/filestructure -> ./_sample_artifacts/filestructure/build/findme.test
+        ./DoesNotExist/
+        ./DoesNotExist
+        ~/DoesNotExist
+        /Does/not/exists
+        ~/.android -> ~/.lockfile
+        ./_sample_artifacts/ipas
+        ./_sample_artifacts/ipas/
+        ./_sample_artifacts/filestructure/build/test.bin
+    - IGNORE_PATH: |-
+        ./_sample_artifacts/filestructure/sub-dir
+        ~/DoesNotExists/This
+        !~/.android/dir
+        *.apk
+    steps:
+    - script:
+        title: Cleanup $TMP_DIR and archive tmp files
         inputs:
-        - path: ./_tmp
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR
+        inputs:
+        - path: $TMP_DIR
         - is_create_path: true
     - script:
         title: Download assets
         inputs:
+        - content: git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
+    - cache-push:
+        title: Latest released version
+        run_if: true
+        is_skippable: false
+        inputs:
+        - is_debug_mode: true
+        - cache_paths: $CACHE_PATH
+        - ignore_check_on_paths: $IGNORE_PATH
+    - script:
+        title: Extract cache and save the cache descriptor
+        is_always_run: true
+        inputs:
         - content: |-
             #!/bin/bash
             set -ex
-            rm -rf ./_sample_artifacts
-            git clone https://github.com/bitrise-samples/sample-artifacts.git ./_sample_artifacts
-    - change-workdir:
-        title: Switch working dir to test / _tmp dir
-        description: |-
-          To prevent step testing issues, like referencing relative
-          files with just './some-file' in the step's code, which would
-          work for testing the step from this directory directly
-          but would break if the step is included in another `bitrise.yml`.
+
+            # extract the archive to get the current stable step version's cache descriptor file
+            tar -xPf /tmp/cache-archive.tar
+            mv "/tmp/cache-info.json" "/tmp/cache-info_orig.json"
+
+            # restore the workdir for the in-progress step version
+            rm -rf $TMP_DIR/*
+            git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
+    - path::./:
+        title: in-progress version
+        run_if: true
+        is_skippable: false
+        inputs:
+        - is_debug_mode: true
+        - cache_paths: $CACHE_PATH
+        - ignore_check_on_paths: $IGNORE_PATH
+    - script:
+        title: Compare cache descriptors
         run_if: true
         inputs:
-        - path: ./_workdir
+        - content: |-
+            #!/bin/bash
+            set -ex
+
+            # extract the archive to get the in-progress version's cache descriptor file
+            tar -xPf /tmp/cache-archive.tar
+
+            # check if the current stable step version's cache descriptor file is identical to the
+            # in-progress step version's cache descriptor file
+            if [ "$(cat /tmp/cache-info_orig.json)" != "$(cat /tmp/cache-info.json)" ] ; then
+                echo "Cache descriptor file changed"
+
+                cp "/tmp/cache-info.json" "$BITRISE_DEPLOY_DIR/cache-info.json"
+                cp "/tmp/cache-info_orig.json" "$BITRISE_DEPLOY_DIR/cache-info_orig.json"
+
+                exit 1
+            fi
+
+  smoke_test:
+    description: |
+      Simple test to make sure the step is able to cache files
+      using some exclude and include paths.
+    envs:
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp1
+    steps:
+    - script:
+        title: Cleanup $TMP_DIR and archive tmp files
+        inputs:
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR
+        inputs:
+        - path: $TMP_DIR
+        - is_create_path: true
+    - script:
+        title: Download assets
+        inputs:
+        - content:  git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR/_workdir
+        run_if: true
+        inputs:
+        - path: $TMP_DIR/_workdir
         - is_create_path: true
     - path::./:
         title: Step Test
@@ -73,26 +162,45 @@ workflows:
             ~/DoesNotExists/This
             !~/.android/dir
             *.apk
+
+  ignore_path_test:
+    description: |
+      Tests if ignored file's change does not triggers new cache creation.
+      An ignored file (in the cache archive) should remain as it was originally, 
+      even if it gets modified (locally) betweeen two cache push step runs.
+    envs:
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp2
+    - CACHE_PATH: |
+        $TMP_DIR
+    - IGNORE_PATH: |
+        $TMP_DIR/test_ignorechanges.txt
+        !*.mp3
+    steps:
     - script:
-        title: Create another samples
+        title: Cleanup $TMP_DIR and archive tmp files
+        inputs:
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR
+        inputs:
+        - path: $TMP_DIR
+        - is_create_path: true
+    - script:
+        title: Create sample files
         is_always_run: true
         inputs:
         - content: |-
             #!/bin/bash
             set -ex
-            rm -rf /tmp/cache-archive.tar
-            rm -rf /tmp/cache-info.json
-            rm -rf ./another_samples
-            mkdir ./another_samples
 
-            #should follow changes
-            echo "content" > ./another_samples/test_file1.txt
+            # should follow changes
+            echo "content" > $TMP_DIR/test_file1.txt
 
-            #should not exists
-            echo "content" > ./another_samples/test_exclude_ext.mp3
+            # should not exists
+            echo "content" > $TMP_DIR/test_exclude_ext.mp3
 
-            #should exists but ignore changes
-            echo "content" > ./another_samples/test_ignorechanges.txt
+            # should exists but ignore changes
+            echo "content" > $TMP_DIR/test_ignorechanges.txt
     - path::./:
         title: Step Test
         is_always_run: true
@@ -101,27 +209,31 @@ workflows:
         inputs:
         - compress_archive: true
         - is_debug_mode: true
-        - cache_paths: |
-            ./another_samples
-        - ignore_check_on_paths: |-
-            ./another_samples/test_ignorechanges.txt
-            !*.mp3
+        - cache_paths: $CACHE_PATH
+        - ignore_check_on_paths: $IGNORE_PATH
     - script:
-        title: Store MD5 hash and check if file doesn't exists
+        title: Store MD5 hash of an ignored file and modify it
         is_always_run: true
         inputs:
         - content: |-
             #!/bin/bash
             set -ex
             
-            rm -rf ./another_samples
+            # remove TMP_DIR to cleanup test_ignorechanges.txt file
+            rm -rf $TMP_DIR
+            # extract the archive to get the archived test_ignorechanges.txt file
             tar -xPf /tmp/cache-archive.tar
 
-            envman add --key MD5PREVIOUSLY --value $(md5 -q ./another_samples/test_ignorechanges.txt)
-            echo "content" >> ./another_samples/test_ignorechanges.txt
+            # export the MD5 hash of test_ignorechanges.txt file
+            # this file's content should remain as it is (in the archive) even if it gets modified
+            # since this files is in ignore list and no other files changed
+            envman add --key MD5PREVIOUSLY --value $(md5 -q $TMP_DIR/test_ignorechanges.txt)
 
-            #should not exists
-            if [ -f ./another_samples/test_exclude_ext.mp3 ]; then
+            # following cache should not update the archive even if this file changes
+            echo "content" >> $TMP_DIR/test_ignorechanges.txt
+
+            # .mp3 is part of the exclude list, should not exists
+            if [ -f $TMP_DIR/test_exclude_ext.mp3 ]; then
               echo "File exists."
               exit 1
             fi
@@ -133,11 +245,8 @@ workflows:
         inputs:
         - compress_archive: true
         - is_debug_mode: true
-        - cache_paths: |
-            ./another_samples
-        - ignore_check_on_paths: |-
-            ./another_samples/test_ignorechanges.txt
-            !*.mp3
+        - cache_paths: $CACHE_PATH
+        - ignore_check_on_paths: $IGNORE_PATH
     - script:
         title: Check if MD5 matches the previous one
         is_always_run: true
@@ -146,17 +255,20 @@ workflows:
             #!/bin/bash
             set -ex
             
-            rm -rf ./another_samples
+            # remove TMP_DIR to cleanup test_ignorechanges.txt file
+            rm -rf $TMP_DIR
+            # extract the archive to get the archived test_ignorechanges.txt file
             tar -xPf /tmp/cache-archive.tar
 
-            export MD5CURRENT=$(md5 -q ./another_samples/test_ignorechanges.txt)
+            # test_ignorechanges.txt was part of the ignore list, so it's change should not present in the archive
+            export MD5CURRENT=$(md5 -q $TMP_DIR/test_ignorechanges.txt)
             if [ "$MD5CURRENT" != "$MD5PREVIOUSLY" ]; then
               echo "MD5 changed."
               exit 1
             fi
 
-            #should not exists
-            if [ -f ./another_samples/test_exclude_ext.mp3 ]; then
+            # .mp3 is part of the exclude list, should not exists
+            if [ -f $TMP_DIR/test_exclude_ext.mp3 ]; then
               echo "File exists."
               exit 1
             fi

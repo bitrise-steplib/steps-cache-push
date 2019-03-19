@@ -3,11 +3,24 @@ package main
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
+	"github.com/bitrise-io/go-utils/pathutil"
+)
+
+// ChangeIndicator ...
+type ChangeIndicator string
+
+const (
+	// MD5 ...
+	MD5 = ChangeIndicator("file-content-hash")
+	// MODTIME ...
+	MODTIME = ChangeIndicator("file-mod-time")
 )
 
 // result stores how the keys are different in two cache descriptor.
@@ -20,8 +33,8 @@ type result struct {
 	added          []string
 }
 
-// triggerNewCache reports whether a new cache needs to be generated or not.
-func (r result) triggerNewCache() bool {
+// hasChanges reports whether a new cache needs to be generated or not.
+func (r result) hasChanges() bool {
 	return len(r.removed) > 0 || len(r.changed) > 0 || len(r.added) > 0
 }
 
@@ -112,4 +125,26 @@ func fileModtime(pth string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%d", fi.ModTime().Unix()), nil
+}
+
+// readCacheDescriptor reads cache descriptor from pth is exists.
+func readCacheDescriptor(pth string) (map[string]string, error) {
+	if exists, err := pathutil.IsPathExists(pth); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, nil
+	}
+
+	fileBytes, err := fileutil.ReadBytesFromFile(pth)
+	if err != nil {
+		return nil, err
+	}
+
+	var previousFilePathMap map[string]string
+	err = json.Unmarshal(fileBytes, &previousFilePathMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return previousFilePathMap, nil
 }

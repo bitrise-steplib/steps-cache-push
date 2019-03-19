@@ -12,6 +12,20 @@ import (
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
+func createDirStruct(t *testing.T, contentByPth map[string]string) {
+	for pth, content := range contentByPth {
+		dir := filepath.Dir(pth)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir: %s", err)
+			return
+		}
+		if err := fileutil.WriteStringToFile(pth, content); err != nil {
+			t.Fatalf("failed to write file: %s", err)
+			return
+		}
+	}
+}
+
 func Test_parseIgnoreListItem(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -220,20 +234,6 @@ func Test_parseIgnoreList(t *testing.T) {
 				t.Errorf("parseIgnoreList() = %v, want %v", got, tt.excludeByPattern)
 			}
 		})
-	}
-}
-
-func createDirStruct(t *testing.T, contentByPth map[string]string) {
-	for pth, content := range contentByPth {
-		dir := filepath.Dir(pth)
-		if err := os.MkdirAll(dir, 0777); err != nil {
-			t.Fatalf("failed to create dir: %s", err)
-			return
-		}
-		if err := fileutil.WriteStringToFile(pth, content); err != nil {
-			t.Fatalf("failed to write file: %s", err)
-			return
-		}
 	}
 }
 

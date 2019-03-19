@@ -1,6 +1,7 @@
 go/bin/
 go/pkg/
 .bitrise*
-_tmp
+_tmp*
 .gows*
 _sample_artifacts
+_cache
