@@ -47,6 +47,7 @@ workflows:
         ~/DoesNotExists/This
         !~/.android/dir
         *.apk
+        !./_sample_artifacts/filestructure/*.txt
     steps:
     - script:
         title: Cleanup $TMP_DIR and archive tmp files
