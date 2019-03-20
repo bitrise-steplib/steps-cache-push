@@ -155,12 +155,3 @@ inputs:
         Cache Upload URL
       is_required: true
       is_dont_change_value: true
-  - compare_cache_info_path: $BITRISE_CACHE_INFO_PATH
-    opts:
-      title: "Cache Info file path, for compare"
-      summary: "Compare the fingerprints against this Cache Info"
-      description: |-
-        Compare the fingerprints against this Cache Info, to see if cache
-        update/upload is required or not.
-      is_required: true
-      is_dont_change_value: true
