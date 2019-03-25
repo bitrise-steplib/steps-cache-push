@@ -80,6 +80,10 @@ func (a *Archive) Write(pths []string) error {
 			return fmt.Errorf("failed to write header(%v), error: %s", header, err)
 		}
 
+		if !info.Mode().IsRegular() {
+			continue
+		}
+
 		file, err := os.Open(pth)
 		if err != nil {
 			return fmt.Errorf("failed to open file(%s), error: %s", pth, err)
