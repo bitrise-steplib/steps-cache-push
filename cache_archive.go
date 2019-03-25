@@ -56,30 +56,33 @@ func NewArchive(pth string, compress bool) (*Archive, error) {
 func (a *Archive) Write(pths []string) error {
 	for _, pth := range pths {
 		info, err := os.Lstat(pth)
+		if err != nil {
+			return fmt.Errorf("failed to lstat(%s), error: %s", pth, err)
+		}
 
 		var link string
 		if info.Mode()&os.ModeSymlink != 0 {
 			link, err = os.Readlink(pth)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to read link(%s), error: %s", pth, err)
 			}
 		}
 
 		header, err := tar.FileInfoHeader(info, link)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get tar file header(%s), error: %s", link, err)
 		}
 
 		header.Name = pth
 		header.ModTime = info.ModTime()
 
 		if err := a.tar.WriteHeader(header); err != nil {
-			return err
+			return fmt.Errorf("failed to write header(%v), error: %s", header, err)
 		}
 
 		file, err := os.Open(pth)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open file(%s), error: %s", pth, err)
 		}
 
 		defer func() {
@@ -89,7 +92,7 @@ func (a *Archive) Write(pths []string) error {
 		}()
 
 		if _, err := io.CopyN(a.tar, file, info.Size()); err != nil && err != io.EOF {
-			return err
+			return fmt.Errorf("failed to copy, error: %s", err)
 		}
 	}
 
