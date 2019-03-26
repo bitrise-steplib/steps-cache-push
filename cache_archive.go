@@ -80,6 +80,7 @@ func (a *Archive) Write(pths []string) error {
 			return fmt.Errorf("failed to write header(%v), error: %s", header, err)
 		}
 
+		// Calling Write on special types like TypeLink, TypeSymlink, TypeChar, TypeBlock, TypeDir, and TypeFifo returns (0, ErrWriteTooLong) regardless of what the Header.Size claims.
 		if !info.Mode().IsRegular() {
 			continue
 		}
@@ -95,8 +96,9 @@ func (a *Archive) Write(pths []string) error {
 			}
 		}()
 
+		// Write writes to the current file in the tar archive. Write returns the error ErrWriteTooLong if more than Header.Size bytes are written after WriteHeader.
 		if _, err := io.CopyN(a.tar, file, info.Size()); err != nil && err != io.EOF {
-			return fmt.Errorf("failed to copy, error: %s", err)
+			return fmt.Errorf("failed to copy, error: %s, file: %s, size: %d for header: %v", err, file.Name(), info.Size(), header)
 		}
 	}
 
