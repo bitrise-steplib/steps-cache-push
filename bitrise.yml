@@ -14,6 +14,7 @@ workflows:
     after_run:
     - smoke_test
     - ignore_path_test
+    - generic_fs_checks
     # - backward_compatibility_test
     steps:
     - go-list:
