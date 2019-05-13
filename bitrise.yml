@@ -373,6 +373,56 @@ workflows:
               exit 1
             fi
 
+  stack-versions:
+    description: |
+      Test that archive_info.json containing stack ID is created.
+    envs:
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_stack_verions
+    - CACHE_PATH: |
+        $TMP_DIR
+    steps:
+    - script:
+        title: Cleanup $TMP_DIR and archive tmp files
+        inputs:
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR
+        inputs:
+        - path: $TMP_DIR
+        - is_create_path: true
+    - script:
+        title: Create sample files
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            # file in root
+            echo "content" > $TMP_DIR/test_file1.txt
+    - path::./:
+        title: Step Test
+        is_always_run: true
+        run_if: true
+        is_skippable: false
+        inputs:
+        - compress_archive: true
+        - is_debug_mode: true
+        - cache_paths: $CACHE_PATH
+    - script:
+        title: Check that archive_info.json exists
+        inputs:
+        - content: |-
+            #!/bin/env bash
+            set -ex
+            # remove TMP_DIR to cleanup
+            rm -rf $TMP_DIR
+            # extract the archive
+            firstfile="$(tar -b 1024 -tf /tmp/cache-archive.tar | while read item ; do [[ "$item" =~ .* ]] && echo "$item" && break ; done )"
+            echo $firstfile
+            if [ $firstfile != "archive_info.json" ]; then 
+              echo "archive_info.json not found as first file in archive"
+              exit 1
+            fi
+
   # ----------------------------------------------------------------
   # --- Utility workflows
   dep-update:

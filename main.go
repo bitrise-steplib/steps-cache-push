@@ -21,6 +21,7 @@ import (
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
+	stackVersionsPath = "archive_info.json"
 )
 
 func logErrorfAndExit(format string, args ...interface{}) {
@@ -148,6 +149,15 @@ func main() {
 	var pths []string
 	for pth := range indicatorByPth {
 		pths = append(pths, pth)
+	}
+
+	stackData, err := stackVersions(configs.StackID)
+	if err != nil {
+		logErrorfAndExit("Failed to get stack version info: %s", err)
+	}
+	// This is the first file written, to speed up reading it in subsequent builds
+	if err = archive.writeData(stackData, stackVersionsPath); err != nil {
+		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
 	}
 
 	if err := archive.Write(pths); err != nil {
