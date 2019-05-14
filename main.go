@@ -67,7 +67,7 @@ func main() {
 		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	if len(indicatorByPth) == 0 {
 		log.Warnf("No path to cache, skip caching...")
@@ -95,7 +95,7 @@ func main() {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	// Checking file changes
 	if prevDescriptor != nil {
@@ -128,10 +128,10 @@ func main() {
 		logDebugPaths(result.addedIgnored)
 
 		if result.hasChanges() {
-			log.Donef("File changes found in %s\n", time.Now().Sub(startTime))
+			log.Donef("File changes found in %s\n", time.Since(startTime))
 		} else {
-			log.Donef("No files found in %s\n", time.Now().Sub(startTime))
-			log.Printf("Total time: %s", time.Now().Sub(stepStartedAt))
+			log.Donef("No files found in %s\n", time.Since(startTime))
+			log.Printf("Total time: %s", time.Since(stepStartedAt))
 			os.Exit(0)
 		}
 	}
@@ -172,7 +172,7 @@ func main() {
 		logErrorfAndExit("Failed to close archive: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	// Upload cache archive
 	startTime = time.Now()
@@ -182,6 +182,6 @@ func main() {
 	if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL); err != nil {
 		logErrorfAndExit("Failed to upload archive: %s", err)
 	}
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
-	log.Donef("Total time: %s", time.Now().Sub(stepStartedAt))
+	log.Donef("Done in %s\n", time.Since(startTime))
+	log.Donef("Total time: %s", time.Since(stepStartedAt))
 }
