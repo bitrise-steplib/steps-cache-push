@@ -17,7 +17,7 @@ func TestSimpleProgress(t *testing.T) {
 		t.Log("- SimpleProgress [end] -")
 	})
 
-	duration := time.Now().Sub(startTime)
+	duration := time.Since(startTime)
 	if duration >= time.Duration(4)*time.Second {
 		t.Fatalf("Should take no more than 4 sec, but got: %s", duration)
 	}
@@ -38,7 +38,7 @@ func TestSimpleProgressE(t *testing.T) {
 		})
 		require.NoError(t, actionErr)
 
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 		if duration >= time.Duration(4)*time.Second {
 			t.Fatalf("Should take no more than 4 sec, but got: %s", duration)
 		}
@@ -58,7 +58,7 @@ func TestSimpleProgressE(t *testing.T) {
 		})
 		require.EqualError(t, actionErr, "Test error")
 
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 		if duration >= time.Duration(4)*time.Second {
 			t.Fatalf("Should take no more than 4 sec, but got: %s", duration)
 		}

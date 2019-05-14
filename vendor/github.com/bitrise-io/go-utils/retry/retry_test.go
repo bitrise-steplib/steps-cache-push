@@ -87,7 +87,7 @@ func TestRetry(t *testing.T) {
 			return errors.New("error")
 		})
 
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 
 		require.Error(t, err)
 		require.Equal(t, "error", err.Error())
@@ -107,7 +107,7 @@ func TestRetry(t *testing.T) {
 			return errors.New("error")
 		})
 
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 
 		require.Error(t, err)
 		require.Equal(t, "error", err.Error())
