@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func stackVersions(stackID string) ([]byte, error) {
+func stackVersionData(stackID string) ([]byte, error) {
 	type archiveInfo struct {
 		StackID string `json:"stack_id,omitempty"`
 	}

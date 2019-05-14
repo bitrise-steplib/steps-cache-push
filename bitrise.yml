@@ -15,6 +15,7 @@ workflows:
     - smoke_test
     - ignore_path_test
     - generic_fs_checks
+    - test-stack-version
     # - backward_compatibility_test
     steps:
     - go-list:
@@ -373,11 +374,11 @@ workflows:
               exit 1
             fi
 
-  stack-versions:
+  test-stack-version:
     description: |
       Test that archive_info.json containing stack ID is created.
     envs:
-    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_stack_verions
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_stack_version
     - CACHE_PATH: |
         $TMP_DIR
     steps:

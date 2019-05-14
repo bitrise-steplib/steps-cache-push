@@ -151,7 +151,7 @@ func main() {
 		pths = append(pths, pth)
 	}
 
-	stackData, err := stackVersions(configs.StackID)
+	stackData, err := stackVersionData(configs.StackID)
 	if err != nil {
 		logErrorfAndExit("Failed to get stack version info: %s", err)
 	}
