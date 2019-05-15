@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/bitrise-tools/go-steputils/stepconf"
+	"github.com/bitrise-io/go-steputils/stepconf"
 )
 
 // Config stores the step inputs
