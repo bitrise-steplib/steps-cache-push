@@ -419,7 +419,7 @@ workflows:
             # extract the archive
             firstfile="$(tar -b 1024 -tf /tmp/cache-archive.tar | while read item ; do [[ "$item" =~ .* ]] && echo "$item" && break ; done )"
             echo $firstfile
-            if [ $firstfile != "archive_info.json" ]; then 
+            if [ $firstfile != "/tmp/archive_info.json" ]; then 
               echo "archive_info.json not found as first file in archive"
               exit 1
             fi

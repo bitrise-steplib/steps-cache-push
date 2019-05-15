@@ -21,7 +21,7 @@ import (
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
-	stackVersionsPath = "archive_info.json"
+	stackVersionsPath = "/tmp/archive_info.json"
 )
 
 func logErrorfAndExit(format string, args ...interface{}) {
