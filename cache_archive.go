@@ -112,19 +112,24 @@ func (a *Archive) WriteHeader(descriptor map[string]string, descriptorPth string
 		return err
 	}
 
-	closingHeader := &tar.Header{
+	return a.writeData(b, descriptorPth)
+}
+
+// writeData writes the byte array into the archive.
+func (a *Archive) writeData(data []byte, descriptorPth string) error {
+	header := &tar.Header{
 		Name:     descriptorPth,
-		Size:     int64(len(b)),
+		Size:     int64(len(data)),
 		Typeflag: tar.TypeReg,
 		Mode:     0600,
 		ModTime:  time.Now(),
 	}
 
-	if err := a.tar.WriteHeader(closingHeader); err != nil {
+	if err := a.tar.WriteHeader(header); err != nil {
 		return err
 	}
 
-	if _, err := io.Copy(a.tar, bytes.NewReader(b)); err != nil && err != io.EOF {
+	if _, err := io.Copy(a.tar, bytes.NewReader(data)); err != nil && err != io.EOF {
 		return err
 	}
 	return nil
