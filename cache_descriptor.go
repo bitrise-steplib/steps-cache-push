@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
@@ -82,19 +83,45 @@ func cacheDescriptor(indicatorByCachePth map[string]string, method ChangeIndicat
 			continue
 		}
 
-		var indicator string
-		var err error
-		if method == MD5 {
-			indicator, err = fileContentHash(indicatorPth)
-		} else {
-			indicator, err = fileModtime(indicatorPth)
-		}
+		indicator, err := readlinkOrEmptyIfInval(indicatorPth)
 		if err != nil {
 			return nil, err
+		}
+
+		if indicator == "" {
+			if method == MD5 {
+				indicator, err = fileContentHash(indicatorPth)
+			} else {
+				indicator, err = fileModtime(indicatorPth)
+			}
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			indicator = "symlink: " + indicator
 		}
 		descriptor[pth] = indicator
 	}
 	return descriptor, nil
+}
+
+func readlinkOrEmptyIfInval(pth string) (string, error) {
+	link, err := os.Readlink(pth)
+	if err != nil {
+		var ok bool
+
+		var pathError *os.PathError
+		pathError, ok = err.(*os.PathError)
+		if ok {
+			var errno syscall.Errno
+			errno, ok = pathError.Err.(syscall.Errno)
+			if ok && errno == syscall.EINVAL {
+				return "", nil
+			}
+		}
+	}
+
+	return link, err
 }
 
 // fileContentHash returns file's md5 content hash.

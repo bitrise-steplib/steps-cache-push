@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -71,6 +72,12 @@ func Test_cacheDescriptor(t *testing.T) {
 
 	createDirStruct(t, pths)
 
+	err = os.Symlink("meow", filepath.Join(tmpDir, "subdir", "symlink"))
+	if err != nil {
+		t.Fatalf("failed to create symlink: %s", err)
+		return
+	}
+
 	tests := []struct {
 		name                string
 		indicatorByCachePth map[string]string
@@ -90,6 +97,13 @@ func Test_cacheDescriptor(t *testing.T) {
 			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "file1"): filepath.Join(tmpDir, "subdir", "file2")},
 			method:              MD5,
 			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "d41d8cd98f00b204e9800998ecf8427e"}, // empty string MD5 hash
+			wantErr:             false,
+		},
+		{
+			name:                "symlink",
+			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "symlink"): filepath.Join(tmpDir, "subdir", "symlink")},
+			method:              MD5,
+			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "symlink"): "symlink: meow"},
 			wantErr:             false,
 		},
 	}
