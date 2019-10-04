@@ -212,9 +212,7 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 		} else if len(indicator) == 0 {
 			// the file's own content fluctuates existing cache invalidation
 			indicator = pth
-		} else {
-			// the file's indicator content fluctuates existing cache invalidation
-		}
+		} // else: the file's indicator content fluctuates existing cache invalidation
 
 		indicatorByCachePth[pth] = indicator
 	}
