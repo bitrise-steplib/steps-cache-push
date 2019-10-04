@@ -318,6 +318,10 @@ workflows:
             ln -s $LINKED_FILES/test_cache_file.txt $CACHE_PATH/mysymlink
             ln $LINKED_FILES/test_cache_file.txt $CACHE_PATH/myhardlink
 
+            # symlink to a non-existent file
+            cd $CACHE_PATH
+            ln -s nonexistent_target $CACHE_PATH/invalid_symlink
+
             # symlink to a directory
             ln -s $LINKED_FILES $CACHE_PATH/symlink_dir
 
@@ -378,6 +382,11 @@ workflows:
 
             if [ "$(< $CACHE_PATH/mysymlink)" != "$(< $LINKED_FILES/test_cache_file.txt)" ]; then
               echo "file content mismatch"
+              exit 1
+            fi
+
+            if [ ! -L $CACHE_PATH/invalid_symlink ]; then
+              echo "symlink does not exist"
               exit 1
             fi
 

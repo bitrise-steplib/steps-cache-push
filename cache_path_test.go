@@ -359,11 +359,15 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 	createDirStruct(t, pths)
 
 	linkFilePath := filepath.Join(tmpDir, "dir_with_symlink", "link_file")
+	invalidTargetLinkPath := filepath.Join(tmpDir, "dir_with_symlink", "link_invalid")
 	linkDirPath := filepath.Join(tmpDir, "dir_with_symlink", "link_dir")
 	if err := os.Symlink(filepath.Join(tmpDir, "dir_with_symlink", "file"), linkFilePath); err != nil {
 		t.Fatalf("failed to create symlink, error: %s", err)
 	}
 	if err := os.Symlink(filepath.Join(tmpDir), linkDirPath); err != nil {
+		t.Fatalf("failed to create symlink, error: %s", err)
+	}
+	if err := os.Symlink("nonexistent_target", invalidTargetLinkPath); err != nil {
 		t.Fatalf("failed to create symlink, error: %s", err)
 	}
 
@@ -422,8 +426,9 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 			indicatorByPath: map[string]string{filepath.Join(tmpDir, "dir_with_symlink"): ""},
 			normalized: map[string]string{
 				filepath.Join(tmpDir, "dir_with_symlink", "file"): "",
-				linkFilePath: "-",
-				linkDirPath:  "-",
+				linkFilePath:          "-",
+				linkDirPath:           "-",
+				invalidTargetLinkPath: "-",
 			},
 		},
 	}
@@ -616,6 +621,11 @@ func Test_isSymlink(t *testing.T) {
 		t.Errorf("setup: failed to create symlink, error: %s", err)
 	}
 
+	invalidTargetLinkPth := path.Join(tmpDir, "link_invalid")
+	if err := os.Symlink("nonexistent_target", invalidTargetLinkPth); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
 	tests := []struct {
 		name    string
 		pth     string
@@ -631,6 +641,12 @@ func Test_isSymlink(t *testing.T) {
 		{
 			name:    "symlink to dir",
 			pth:     linkDirPth,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "invalid target",
+			pth:     invalidTargetLinkPth,
 			want:    true,
 			wantErr: false,
 		},
