@@ -82,8 +82,8 @@ func cacheDescriptor(indicatorByCachePth map[string]string, method ChangeIndicat
 			continue
 		}
 
-		var indicator string
 		var err error
+		var indicator string
 		if method == MD5 {
 			indicator, err = fileContentHash(indicatorPth)
 		} else {
