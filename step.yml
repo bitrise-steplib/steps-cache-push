@@ -149,7 +149,7 @@ inputs:
       is_dont_change_value: true
   - cache_api_url: $BITRISE_CACHE_API_URL
     opts:
-      title: "TMP: Cache Upload URL"
+      title: "Cache Upload URL"
       summary: "Cache Upload URL"
       description: |-
         Cache Upload URL
