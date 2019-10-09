@@ -21,6 +21,7 @@ import (
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
+	stackVersionsPath = "/tmp/archive_info.json"
 )
 
 func logErrorfAndExit(format string, args ...interface{}) {
@@ -66,7 +67,7 @@ func main() {
 		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	if len(indicatorByPth) == 0 {
 		log.Warnf("No path to cache, skip caching...")
@@ -94,7 +95,7 @@ func main() {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	// Checking file changes
 	if prevDescriptor != nil {
@@ -127,10 +128,10 @@ func main() {
 		logDebugPaths(result.addedIgnored)
 
 		if result.hasChanges() {
-			log.Donef("File changes found in %s\n", time.Now().Sub(startTime))
+			log.Donef("File changes found in %s\n", time.Since(startTime))
 		} else {
-			log.Donef("No files found in %s\n", time.Now().Sub(startTime))
-			log.Printf("Total time: %s", time.Now().Sub(stepStartedAt))
+			log.Donef("No files found in %s\n", time.Since(startTime))
+			log.Printf("Total time: %s", time.Since(stepStartedAt))
 			os.Exit(0)
 		}
 	}
@@ -150,6 +151,15 @@ func main() {
 		pths = append(pths, pth)
 	}
 
+	stackData, err := stackVersionData(configs.StackID)
+	if err != nil {
+		logErrorfAndExit("Failed to get stack version info: %s", err)
+	}
+	// This is the first file written, to speed up reading it in subsequent builds
+	if err = archive.writeData(stackData, stackVersionsPath); err != nil {
+		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
+	}
+
 	if err := archive.Write(pths); err != nil {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
@@ -162,7 +172,7 @@ func main() {
 		logErrorfAndExit("Failed to close archive: %s", err)
 	}
 
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
+	log.Donef("Done in %s\n", time.Since(startTime))
 
 	// Upload cache archive
 	startTime = time.Now()
@@ -172,6 +182,6 @@ func main() {
 	if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL); err != nil {
 		logErrorfAndExit("Failed to upload archive: %s", err)
 	}
-	log.Donef("Done in %s\n", time.Now().Sub(startTime))
-	log.Donef("Total time: %s", time.Now().Sub(stepStartedAt))
+	log.Donef("Done in %s\n", time.Since(startTime))
+	log.Donef("Total time: %s", time.Since(stepStartedAt))
 }
