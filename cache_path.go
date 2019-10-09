@@ -1,4 +1,14 @@
 // Cache path and ignore path related functions.
+//
+// Ignoring symlink target changes for cache invalidation, as we expect
+// the symlinks to be yarn workspace symlink: https://yarnpkg.com/blog/2018/02/15/nohoist/.
+// The symlinks are included in the cache, just not chhecked if the target they point to is changed.
+// If case it is a link to a directory outside of the cached paths (e.g. yarn workspaces),
+// will not add the linked directory to the cache, and will not invalidate the cache if it changes,
+// as we expect them to be part of the repository.
+// If it links to a directory included in the cache already, then also ignoring it.
+// The directory contents will be added to the cache as regular files, no need to check them twice.
+// Symlinks to files are also ignored.
 package main
 
 import (
@@ -11,16 +21,6 @@ import (
 	"github.com/bitrise-io/go-utils/pathutil"
 	glob "github.com/ryanuber/go-glob"
 )
-
-// Ignoring symlink target changes for cache invalidation, as we expect
-// the symlinks to be yarn workspace symlink: https://yarnpkg.com/blog/2018/02/15/nohoist/.
-// The symlinks are included in the cache, just not chhecked if the target they point to is changed.
-// If case it is a link to a directory outside of the cached paths (e.g. yarn workspaces),
-// will not add the linked directory to the cache, and will not invalidate the cache if it changes,
-// as we expect them to be part of the repository.
-// If it links to a directory included in the cache already, then also ignoring it.
-// The directory contents will be added to the cache as regular files, no need to check them twice.
-// Symlinks to files are also ignored.
 
 // parseIncludeListItem separates path to cache and change indicator path.
 func parseIncludeListItem(item string) (string, string) {
