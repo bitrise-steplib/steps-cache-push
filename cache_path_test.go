@@ -359,14 +359,16 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 	createDirStruct(t, pths)
 
 	linkFilePath := filepath.Join(tmpDir, "dir_with_symlink", "link_file")
-	invalidTargetLinkPath := filepath.Join(tmpDir, "dir_with_symlink", "link_invalid")
-	linkDirPath := filepath.Join(tmpDir, "dir_with_symlink", "link_dir")
 	if err := os.Symlink(filepath.Join(tmpDir, "dir_with_symlink", "file"), linkFilePath); err != nil {
 		t.Fatalf("failed to create symlink, error: %s", err)
 	}
+
+	linkDirPath := filepath.Join(tmpDir, "dir_with_symlink", "link_dir")
 	if err := os.Symlink(filepath.Join(tmpDir), linkDirPath); err != nil {
 		t.Fatalf("failed to create symlink, error: %s", err)
 	}
+
+	invalidTargetLinkPath := filepath.Join(tmpDir, "dir_with_symlink", "link_invalid")
 	if err := os.Symlink("nonexistent_target", invalidTargetLinkPath); err != nil {
 		t.Fatalf("failed to create symlink, error: %s", err)
 	}

@@ -12,6 +12,16 @@ import (
 	glob "github.com/ryanuber/go-glob"
 )
 
+// Ignoring symlink target changes for cache invalidation, as we expect
+// the symlinks to be yarn workspace symlink: https://yarnpkg.com/blog/2018/02/15/nohoist/.
+// The symlinks are included in the cache, just not chhecked if the target they point to is changed.
+// If case it is a link to a directory outside of the cached paths (e.g. yarn workspaces),
+// will not add the linked directory to the cache, and will not invalidate the cache if it changes,
+// as we expect them to be part of the repository.
+// If it links to a directory included in the cache already, then also ignoring it.
+// The directory contents will be added to the cache as regular files, no need to check them twice.
+// Symlinks to files are also ignored.
+
 // parseIncludeListItem separates path to cache and change indicator path.
 func parseIncludeListItem(item string) (string, string) {
 	// file/or/dir/to/cache -> indicator/file
@@ -66,26 +76,21 @@ func isSymlink(pth string) (bool, error) {
 	return linkFileInfo.Mode()&os.ModeSymlink != 0, nil
 }
 
-// expandPath returns every file included in pth (recursively) if it is a dir,
-// if pth is a file it will be returned as an array.
-func expandPath(root string) (regularFiles []string, irregularPaths []string, err error) {
+// expandPath returns cacheable files inside a directory recursively.
+// If parameter root is a file, it returns that file.
+// An array of regural files and one of symlink is retruned, other irregural files (directory, named pipe, socket) are ignored.
+func expandPath(root string) (regularFiles []string, symlinkPaths []string, err error) {
 	if err := filepath.Walk(root, func(path string, i os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Ignoring symlink target changes for cache invalidation.
-		// If case it a link to a directory outside of the cached paths (e.g. yarn workspaces),
-		// will not add the linked directory to the cache, and will not invalidate cache if it changes.
-		// If it links to a directory included in the cache already, then also ignoring it.
-		// The directory contents will be added to the cache as regular files, so not need to check them twice.
-		// Symlinks to files are also ignored.
 		isLink, err := isSymlink(path)
 		if err != nil {
 			return err
 		}
 		if isLink {
-			irregularPaths = append(irregularPaths, path)
+			symlinkPaths = append(symlinkPaths, path)
 			return nil
 		}
 
@@ -101,7 +106,7 @@ func expandPath(root string) (regularFiles []string, irregularPaths []string, er
 		return nil, nil, err
 	}
 
-	return regularFiles, irregularPaths, nil
+	return regularFiles, symlinkPaths, nil
 }
 
 // normalizeIndicatorByPath modifies indicatorByPath:
@@ -145,14 +150,14 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			continue
 		}
 
-		regularFiles, irregularPaths, err := expandPath(pth)
+		regularFiles, symlinkPaths, err := expandPath(pth)
 		if err != nil {
 			return nil, err
 		}
 		for _, file := range regularFiles {
 			normalized[file] = indicator
 		}
-		for _, file := range irregularPaths {
+		for _, file := range symlinkPaths {
 			// this file's changes does not fluctuates existing cache invalidation
 			normalized[file] = "-"
 		}
