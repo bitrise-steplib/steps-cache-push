@@ -194,14 +194,6 @@ func Test_compare(t *testing.T) {
 }
 
 func Test_result_hasChanges(t *testing.T) {
-	type fields struct {
-		removedIgnored []string
-		removed        []string
-		changed        []string
-		matching       []string
-		addedIgnored   []string
-		added          []string
-	}
 	tests := []struct {
 		name            string
 		removedIgnored  []string
