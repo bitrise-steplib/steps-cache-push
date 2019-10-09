@@ -2,12 +2,6 @@
 
 This step implements Cache Upload for [bitrise.io](https://www.bitrise.io).
 
-## TODO
-
-* CI
-* Unit Tests
-
-
 ## How to use this Step
 
 Can be run directly with the [bitrise CLI](https://github.com/bitrise-io/bitrise),
