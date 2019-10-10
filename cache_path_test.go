@@ -1,14 +1,16 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
 
 	"github.com/bitrise-io/go-utils/fileutil"
-
+	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
 )
 
@@ -244,40 +246,93 @@ func Test_expandPath(t *testing.T) {
 		return
 	}
 
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Warnf("failed to remove directory, error: %s", err)
+		}
+	}()
+
 	pths := map[string]string{
-		filepath.Join(tmpDir, "subdir", "file1"): "",
-		filepath.Join(tmpDir, "subdir", "file2"): "",
+		filepath.Join(tmpDir, "subdir", "file1"):                   "",
+		filepath.Join(tmpDir, "subdir", "file2"):                   "",
+		filepath.Join(tmpDir, "link", "file"):                      "",
+		filepath.Join(tmpDir, "link_dir", "subdir", "file"):        "",
+		filepath.Join(tmpDir, "not_cached_dir", "not_cached_file"): "",
 	}
 	createDirStruct(t, pths)
 
+	linkFilePath := filepath.Join(tmpDir, "link", "symlink_file")
+	if err := os.Symlink(filepath.Join(tmpDir, "link", "file"), linkFilePath); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
+	linkDirPath := filepath.Join(tmpDir, "link_dir", "symlink_dir_outside_cache")
+	if err := os.Symlink(filepath.Join(tmpDir, "link_dir", "not_cached_dir"), linkDirPath); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
 	tests := []struct {
-		name    string
-		pth     string
-		pths    []string
-		wantErr bool
+		name           string
+		pth            string
+		regularFiles   []string
+		irregularPaths []string
+		wantErr        bool
 	}{
 		{
-			name:    "list files in a directory",
-			pth:     filepath.Join(tmpDir, "subdir"),
-			pths:    []string{filepath.Join(tmpDir, "subdir", "file1"), filepath.Join(tmpDir, "subdir", "file2")},
-			wantErr: false,
+			name:           "list files in a directory",
+			pth:            filepath.Join(tmpDir, "subdir"),
+			regularFiles:   []string{filepath.Join(tmpDir, "subdir", "file1"), filepath.Join(tmpDir, "subdir", "file2")},
+			irregularPaths: nil,
+			wantErr:        false,
 		},
 		{
-			name:    "puts file path in an array",
-			pth:     filepath.Join(tmpDir, "subdir", "file1"),
-			pths:    []string{filepath.Join(tmpDir, "subdir", "file1")},
-			wantErr: false,
+			name:           "puts file path in an array",
+			pth:            filepath.Join(tmpDir, "subdir", "file1"),
+			regularFiles:   []string{filepath.Join(tmpDir, "subdir", "file1")},
+			irregularPaths: nil,
+			wantErr:        false,
+		},
+		{
+			name:           "single symlink file",
+			pth:            linkFilePath,
+			regularFiles:   nil,
+			irregularPaths: []string{linkFilePath},
+			wantErr:        false,
+		},
+		{
+			name:           "single symlink directory",
+			pth:            linkDirPath,
+			regularFiles:   nil,
+			irregularPaths: []string{linkDirPath},
+			wantErr:        false,
+		},
+		{
+			name:           "directory with symlink to file in cache dir",
+			pth:            filepath.Join(tmpDir, "link"),
+			regularFiles:   []string{filepath.Join(tmpDir, "link", "file")},
+			irregularPaths: []string{linkFilePath},
+			wantErr:        false,
+		},
+		{
+			name:           "directory with symlink to dir outside of cache dir",
+			pth:            filepath.Join(tmpDir, "link_dir"),
+			regularFiles:   []string{filepath.Join(tmpDir, "link_dir", "subdir", "file")},
+			irregularPaths: []string{linkDirPath},
+			wantErr:        false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := expandPath(tt.pth)
+			got1, got2, err := expandPath(tt.pth)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("expandPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.pths) {
-				t.Errorf("expandPath() = %v, want %v", got, tt.pths)
+			if !reflect.DeepEqual(got1, tt.regularFiles) {
+				t.Errorf("expandPath() = %v want %v", got1, tt.regularFiles)
+			}
+			if !reflect.DeepEqual(got2, tt.irregularPaths) {
+				t.Errorf("expandPath() = %v, want %v", got2, tt.irregularPaths)
 			}
 		})
 	}
@@ -290,11 +345,33 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 		return
 	}
 
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Warnf("failed to remove directory, error: %s", err)
+		}
+	}()
+
 	pths := map[string]string{
-		filepath.Join(tmpDir, "subdir", "file1"): "",
-		filepath.Join(tmpDir, "subdir", "file2"): "",
+		filepath.Join(tmpDir, "subdir", "file1"):          "",
+		filepath.Join(tmpDir, "subdir", "file2"):          "",
+		filepath.Join(tmpDir, "dir_with_symlink", "file"): "",
 	}
 	createDirStruct(t, pths)
+
+	linkFilePath := filepath.Join(tmpDir, "dir_with_symlink", "link_file")
+	if err := os.Symlink(filepath.Join(tmpDir, "dir_with_symlink", "file"), linkFilePath); err != nil {
+		t.Fatalf("failed to create symlink, error: %s", err)
+	}
+
+	linkDirPath := filepath.Join(tmpDir, "dir_with_symlink", "link_dir")
+	if err := os.Symlink(filepath.Join(tmpDir), linkDirPath); err != nil {
+		t.Fatalf("failed to create symlink, error: %s", err)
+	}
+
+	invalidTargetLinkPath := filepath.Join(tmpDir, "dir_with_symlink", "link_invalid")
+	if err := os.Symlink("nonexistent_target", invalidTargetLinkPath); err != nil {
+		t.Fatalf("failed to create symlink, error: %s", err)
+	}
 
 	if err := os.Setenv("NORMALIZE_INDICATOR_BY_PATH_TMP_DIR", tmpDir); err != nil {
 		t.Fatalf("failed to set NORMALIZE_INDICATOR_BY_PATH_TMP_DIR: %s", err)
@@ -340,8 +417,21 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 		{
 			name:            "expands path if it is a dir",
 			indicatorByPath: map[string]string{filepath.Join(tmpDir, "subdir"): ""},
-			normalized:      map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "", filepath.Join(tmpDir, "subdir", "file2"): ""},
-			wantErr:         false,
+			normalized: map[string]string{
+				filepath.Join(tmpDir, "subdir", "file1"): "",
+				filepath.Join(tmpDir, "subdir", "file2"): "",
+			},
+			wantErr: false,
+		},
+		{
+			name:            "set symlink indicator to ignore file for cache invalidation",
+			indicatorByPath: map[string]string{filepath.Join(tmpDir, "dir_with_symlink"): ""},
+			normalized: map[string]string{
+				filepath.Join(tmpDir, "dir_with_symlink", "file"): "",
+				linkFilePath:          "-",
+				linkDirPath:           "-",
+				invalidTargetLinkPath: "-",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -507,6 +597,77 @@ func Test_interleave(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.indicatorByCachePth) {
 				t.Errorf("interleave() = %v, want %v", got, tt.indicatorByCachePth)
+			}
+		})
+	}
+}
+
+func Test_isSymlink(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Errorf("setup: failed to create tmp dir, error: %s", err)
+	}
+
+	tmpFile, err := ioutil.TempFile(tmpDir, "")
+	if err != nil {
+		t.Errorf("setup: failed to create tmp file, error: %s", err)
+	}
+
+	linkPth := path.Join(tmpDir, "symlink")
+	if err := os.Symlink(tmpFile.Name(), linkPth); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
+	linkDirPth := path.Join(tmpDir, "symlink_dir")
+	if err := os.Symlink(tmpDir, linkDirPth); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
+	invalidTargetLinkPth := path.Join(tmpDir, "link_invalid")
+	if err := os.Symlink("nonexistent_target", invalidTargetLinkPth); err != nil {
+		t.Errorf("setup: failed to create symlink, error: %s", err)
+	}
+
+	tests := []struct {
+		name    string
+		pth     string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:    "symlink to file",
+			pth:     linkPth,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "symlink to dir",
+			pth:     linkDirPth,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "invalid target",
+			pth:     invalidTargetLinkPth,
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "regurlar file",
+			pth:     tmpFile.Name(),
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isSymlink(tt.pth)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isSymlink() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isSymlink() = %v, want %v", got, tt.want)
 			}
 		})
 	}

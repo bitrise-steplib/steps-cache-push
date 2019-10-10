@@ -281,17 +281,17 @@ workflows:
       Tests if most of the FS file types are supported.
     envs:
     - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_fs_check
-    - CACHE_PATH: |
-        $TMP_DIR
+    - CACHE_PATH: $TMP_DIR/cache
+    - LINKED_FILES: $TMP_DIR/target
     steps:
     - script:
         title: Cleanup $TMP_DIR and archive tmp files
         inputs:
         - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
     - change-workdir:
-        title: Switch working dir to $TMP_DIR
+        title: Switch working dir to $CACHE_PATH
         inputs:
-        - path: $TMP_DIR
+        - path: $CACHE_PATH
         - is_create_path: true
     - script:
         title: Create sample files
@@ -302,20 +302,28 @@ workflows:
             set -ex
 
             # file in root
-            echo "content" > $TMP_DIR/test_file1.txt
+            echo "content" > $CACHE_PATH/test_file1.txt
 
             # file in subdir
-            mkdir $TMP_DIR/subdir
-            echo "content" > $TMP_DIR/subdir/test_file.mp3
+            mkdir $CACHE_PATH/subdir
+            echo "content" > $CACHE_PATH/subdir/test_file.mp3
 
             # single dir
-            mkdir $TMP_DIR/single_dir
+            mkdir $CACHE_PATH/single_dir
 
+            mkdir $LINKED_FILES
             # symlink to a temp file
-            rm -rf /tmp/test_cache_file.txt
-            echo "content" > /tmp/test_cache_file.txt
-            ln -s /tmp/test_cache_file.txt $TMP_DIR/mysymlink
-            ln /tmp/test_cache_file.txt $TMP_DIR/myhardlink
+            rm -rf $LINKED_FILES/test_cache_file.txt
+            echo "content" > $LINKED_FILES/test_cache_file.txt
+            ln -s $LINKED_FILES/test_cache_file.txt $CACHE_PATH/mysymlink
+            ln $LINKED_FILES/test_cache_file.txt $CACHE_PATH/myhardlink
+
+            # symlink to a non-existent file
+            cd $CACHE_PATH
+            ln -s nonexistent_target $CACHE_PATH/invalid_symlink
+
+            # symlink to a directory
+            ln -s $LINKED_FILES $CACHE_PATH/symlink_dir
 
     - path::./:
         title: Step Test
@@ -334,43 +342,56 @@ workflows:
             #!/bin/bash
             set -ex
             
-            # remove TMP_DIR to cleanup
-            rm -rf $TMP_DIR
+            # remove CACHE_PATH to cleanup
+            rm -rf $CACHE_PATH
+            mkdir $CACHE_PATH
+            cd $CACHE_PATH
+
             # extract the archive
             tar -xPf /tmp/cache-archive.tar
 
-            if [ -d $TMP_DIR/single_dir ]; then
+            if [ -d $CACHE_PATH/single_dir ]; then
               echo "dir should not exist"
               exit 1
             fi
 
-            if [ ! -f $TMP_DIR/test_file1.txt ]; then
+            if [ ! -f $CACHE_PATH/test_file1.txt ]; then
               echo "file should exist"
               exit 1
             fi
 
-            if [ ! -f $TMP_DIR/subdir/test_file.mp3 ]; then
+            if [ ! -f $CACHE_PATH/subdir/test_file.mp3 ]; then
               echo "file should exist"
               exit 1
             fi
 
-            if [ ! -f $TMP_DIR/mysymlink ]; then
+            if [ ! -f $CACHE_PATH/mysymlink ]; then
               echo "file should exist"
               exit 1
             fi
 
-            if [ ! -f $TMP_DIR/myhardlink ]; then
+            if [ ! -f $CACHE_PATH/myhardlink ]; then
               echo "file should exist"
               exit 1
             fi
 
-            if [ "$(< $TMP_DIR/myhardlink)" != "$(< /tmp/test_cache_file.txt)" ]; then
+            if [ "$(< $CACHE_PATH/myhardlink)" != "$(< $LINKED_FILES/test_cache_file.txt)" ]; then
               echo "file content mismatch"
               exit 1
             fi
 
-            if [ "$(< $TMP_DIR/mysymlink)" != "$(< /tmp/test_cache_file.txt)" ]; then
-              echo "file content mismatch"
+            if [ "$($CACHE_PATH/mysymlink)" != "$($LINKED_FILES/test_cache_file.txt)" ]; then
+              echo "symlink path mismatch"
+              exit 1
+            fi
+
+            if [ ! -L $CACHE_PATH/invalid_symlink ]; then
+              echo "symlink does not exist"
+              exit 1
+            fi
+
+            if [ $(cd -P "$CACHE_PATH/symlink_dir" && pwd) != "$LINKED_FILES" ]; then
+              echo "symlink directory path mismatch"
               exit 1
             fi
 

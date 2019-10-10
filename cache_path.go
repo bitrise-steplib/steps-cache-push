@@ -1,7 +1,18 @@
 // Cache path and ignore path related functions.
+//
+// Ignoring symlink target changes for cache invalidation, as we expect
+// the symlinks to be yarn workspace symlink: https://yarnpkg.com/blog/2018/02/15/nohoist/.
+// The symlinks are included in the cache, just not chhecked if the target they point to is changed.
+// If case it is a link to a directory outside of the cached paths (e.g. yarn workspaces),
+// will not add the linked directory to the cache, and will not invalidate the cache if it changes,
+// as we expect them to be part of the repository.
+// If it links to a directory included in the cache already, then also ignoring it.
+// The directory contents will be added to the cache as regular files, no need to check them twice.
+// Symlinks to files are also ignored.
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,25 +67,46 @@ func parseIgnoreList(list []string) map[string]bool {
 	return ignoreByPath
 }
 
-// expandPath returns every file included in pth (recursively) if it is a dir,
-// if pth is a file it will be returned as an array.
-func expandPath(pth string) ([]string, error) {
-	var subPaths []string
-	if err := filepath.Walk(pth, func(p string, i os.FileInfo, err error) error {
+func isSymlink(pth string) (bool, error) {
+	linkFileInfo, err := os.Lstat(pth)
+	if err != nil {
+		return false, fmt.Errorf("failed to get file info, error: %s", err)
+	}
+
+	return linkFileInfo.Mode()&os.ModeSymlink != 0, nil
+}
+
+// expandPath returns cacheable files inside a directory recursively.
+// If parameter root is a file, it returns that file.
+// An array of regural files and one of symlink is retruned, other irregural files (directory, named pipe, socket) are ignored.
+func expandPath(root string) (regularFiles []string, symlinkPaths []string, err error) {
+	if err := filepath.Walk(root, func(path string, i os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if i.IsDir() {
+
+		isLink, err := isSymlink(path)
+		if err != nil {
+			return err
+		}
+		if isLink {
+			symlinkPaths = append(symlinkPaths, path)
 			return nil
 		}
 
-		subPaths = append(subPaths, p)
+		// Not adding directories and non symlink irregural files to the cache
+		// ModeDir | ModeNamedPipe | ModeSocket | ModeDevice | ModeCharDevice | ModeIrregular & i.Mode() != 0
+		if !i.Mode().IsRegular() {
+			return nil
+		}
+
+		regularFiles = append(regularFiles, path)
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return subPaths, nil
+	return regularFiles, symlinkPaths, nil
 }
 
 // normalizeIndicatorByPath modifies indicatorByPath:
@@ -118,12 +150,16 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			continue
 		}
 
-		subPths, err := expandPath(pth)
+		regularFiles, symlinkPaths, err := expandPath(pth)
 		if err != nil {
 			return nil, err
 		}
-		for _, p := range subPths {
-			normalized[p] = indicator
+		for _, file := range regularFiles {
+			normalized[file] = indicator
+		}
+		for _, file := range symlinkPaths {
+			// this file's changes does not fluctuates existing cache invalidation
+			normalized[file] = "-"
 		}
 	}
 	return normalized, nil
@@ -175,15 +211,13 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 			continue
 		}
 
-		if skip {
+		if skip || indicator == "-" {
 			// this file's changes does not fluctuates existing cache invalidation
 			indicator = ""
 		} else if len(indicator) == 0 {
 			// the file's own content fluctuates existing cache invalidation
 			indicator = pth
-		} else {
-			// the file's indicator content fluctuates existing cache invalidation
-		}
+		} // else: the file's indicator content fluctuates existing cache invalidation
 
 		indicatorByCachePth[pth] = indicator
 	}
