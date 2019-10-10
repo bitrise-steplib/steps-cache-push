@@ -380,8 +380,8 @@ workflows:
               exit 1
             fi
 
-            if [ "$(< $CACHE_PATH/mysymlink)" != "$(< $LINKED_FILES/test_cache_file.txt)" ]; then
-              echo "file content mismatch"
+            if [ "$($CACHE_PATH/mysymlink)" != "$($LINKED_FILES/test_cache_file.txt)" ]; then
+              echo "symlink path mismatch"
               exit 1
             fi
 
