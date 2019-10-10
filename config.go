@@ -13,7 +13,7 @@ type Config struct {
 	CacheAPIURL         string `env:"cache_api_url,required"`
 	FingerprintMethodID string `env:"fingerprint_method,opt[file-content-hash,file-mod-time]"`
 	CompressArchive     string `env:"compress_archive,opt[true,false]"`
-	DebugMode           string `env:"is_debug_mode,opt[true,false]"`
+	DebugMode           bool   `env:"is_debug_mode"`
 	StackID             string `env:"BITRISE_STACK_ID"`
 }
 
