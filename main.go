@@ -40,6 +40,8 @@ func main() {
 	configs.Print()
 	fmt.Println()
 
+	log.SetEnableDebugLog(configs.DebugMode)
+
 	// Cleaning paths
 	startTime := time.Now()
 
@@ -104,10 +106,8 @@ func main() {
 		log.Infof("Checking for file changes")
 
 		logDebugPaths := func(paths []string) {
-			if configs.DebugMode == "true" {
-				for _, pth := range paths {
-					log.Debugf("- %s", pth)
-				}
+			for _, pth := range paths {
+				log.Debugf("- %s", pth)
 			}
 		}
 
