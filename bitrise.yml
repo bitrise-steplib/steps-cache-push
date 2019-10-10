@@ -4,8 +4,7 @@ default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 app:
   envs:
   # define these in your .bitrise.secrets.yml
-  # - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL # use file url scheme (file://) to create a cache archive in a local directory
-  - BITRISE_CACHE_API_URL: file:///Users/lpusok/Develop/go/src/github.com/bitrise-steplib/steps-cache-push/cachetest
+  - BITRISE_CACHE_API_URL: $BITRISE_CACHE_API_URL # use file url scheme (file://) to create a cache archive in a local directory
   - ORIG_BITRISE_SOURCE_DIR: $BITRISE_SOURCE_DIR
 
 workflows:
@@ -445,30 +444,6 @@ workflows:
               echo "archive_info.json not found as first file in archive"
               exit 1
             fi
-
-  test-yarn:
-    steps:
-    - change-workdir:
-        title: Switch working dir
-        inputs:
-        - path: /Users/lpusok/Develop/hunfencing-master
-        - is_create_path: true
-    - script:
-        title: Create sample files
-        inputs:
-        - content: |-
-            #!/bin/bash
-            set -ex
-            yarn install
-    - path::./:
-        title: Step Test
-        is_always_run: true
-        run_if: true
-        is_skippable: false
-        inputs:
-        - compress_archive: true
-        - is_debug_mode: true
-        - cache_paths: "node_modules"
 
   # ----------------------------------------------------------------
   # --- Utility workflows
