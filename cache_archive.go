@@ -105,6 +105,7 @@ func (a *Archive) writeOne(pth string) error {
 	fmt.Printf("%+v\n", *header)
 
 	header.Name = pth
+	header.Format = tar.FormatGNU
 
 	if err := a.tar.WriteHeader(header); err != nil {
 		return fmt.Errorf("failed to write header(%v), error: %s", header, err)
