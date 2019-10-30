@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/bitrise-io/go-utils/command"
@@ -63,6 +64,14 @@ func (a *Archive) Write(pths []string) error {
 	return nil
 }
 
+func statTimes(fi os.FileInfo) (atime, mtime, ctime time.Time, err error) {
+	mtime = fi.ModTime()
+	stat := fi.Sys().(*syscall.Stat_t)
+	atime = time.Unix(int64(stat.Atimespec.Sec), int64(stat.Atimespec.Nsec))
+	ctime = time.Unix(int64(stat.Ctimespec.Sec), int64(stat.Ctimespec.Nsec))
+	return
+}
+
 func (a *Archive) writeOne(pth string) error {
 	info, err := os.Lstat(pth)
 	if err != nil {
@@ -82,8 +91,15 @@ func (a *Archive) writeOne(pth string) error {
 		return fmt.Errorf("failed to get tar file header(%s), error: %s", link, err)
 	}
 
+	atime, mtime, ctime, err := statTimes(info)
+	if err != nil {
+		return fmt.Errorf("failed to stat file(%s), error: %s", pth, err)
+	}
+	header.ModTime = mtime
+	header.AccessTime = atime
+	header.ChangeTime = ctime
+
 	header.Name = pth
-	header.ModTime = info.ModTime()
 
 	if err := a.tar.WriteHeader(header); err != nil {
 		return fmt.Errorf("failed to write header(%v), error: %s", header, err)
