@@ -67,8 +67,10 @@ func (a *Archive) Write(pths []string) error {
 func statTimes(fi os.FileInfo) (atime, mtime, ctime time.Time, err error) {
 	mtime = fi.ModTime()
 	stat := fi.Sys().(*syscall.Stat_t)
-	atime = time.Unix(int64(stat.Atimespec.Sec), int64(stat.Atimespec.Nsec))
-	ctime = time.Unix(int64(stat.Ctimespec.Sec), int64(stat.Ctimespec.Nsec))
+	//atime = time.Unix(int64(stat.Atimespec.Sec), int64(stat.Atimespec.Nsec))
+	//ctime = time.Unix(int64(stat.Ctimespec.Sec), int64(stat.Ctimespec.Nsec))
+	atime = time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
+	ctime = time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
 	return
 }
 
