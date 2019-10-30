@@ -97,9 +97,12 @@ func (a *Archive) writeOne(pth string) error {
 	if err != nil {
 		return fmt.Errorf("failed to stat file(%s), error: %s", pth, err)
 	}
+
 	header.ModTime = mtime
 	header.AccessTime = atime
 	header.ChangeTime = ctime
+
+	fmt.Printf("%+v\n", *header)
 
 	header.Name = pth
 
