@@ -109,7 +109,7 @@ func TestArchive_WriteHeader(t *testing.T) {
 		t.Fatalf("failed to create archive: %s", err)
 	}
 
-	if err := archive.WriteHeader(map[string]string{"file/to/cache": "indicator/file"}, cacheInfoFilePath); err != nil {
+	if err := archive.WriteHeader(map[string]map[string]bool{"indicator/file": {"file/to/cache": true}}, cacheInfoFilePath); err != nil {
 		t.Fatalf("failed to write archive header: %s", err)
 	}
 }

@@ -39,13 +39,11 @@ func (r result) hasChanges() bool {
 }
 
 // compare compares two cache descriptor file and return the differences.
-func compare(old map[string]string, new map[string]string) (r result) {
-	newCopy := make(map[string]string, len(new))
-	for k, v := range new {
-		newCopy[k] = v
-	}
+func compare(old map[string]map[string]bool, new map[string]map[string]bool) (r result) {
+	oldCopy := transformToIndicatorByPth(old)
+	newCopy := transformToIndicatorByPth(new)
 
-	for oldPth, oldIndicator := range old {
+	for oldPth, oldIndicator := range oldCopy {
 		newIndicator, ok := newCopy[oldPth]
 		switch {
 		case !ok && oldIndicator == "-":
@@ -72,27 +70,46 @@ func compare(old map[string]string, new map[string]string) (r result) {
 	return
 }
 
-// cacheDescriptor creates a cache descriptor for a given cache_path - change_indicator_path mapping.
-func cacheDescriptor(indicatorByCachePth map[string]string, method ChangeIndicator) (map[string]string, error) {
-	descriptor := map[string]string{}
-	for pth, indicatorPth := range indicatorByCachePth {
-		if len(indicatorPth) == 0 {
-			// this file's changes does not fluctuates existing cache invalidation
-			descriptor[pth] = "-"
-			continue
+// transformToIndicatorByPth transforms an indicator map to an indicatorByPth map.
+func transformToIndicatorByPth(indicatorMap map[string]map[string]bool) map[string]string {
+	var indicatorByPth = map[string]string{}
+	for indicator, pthMap := range indicatorMap {
+		for pth := range pthMap {
+			indicatorByPth[pth] = indicator
 		}
+	}
+	return indicatorByPth
+}
 
-		var err error
-		var indicator string
-		if method == MD5 {
-			indicator, err = fileContentHash(indicatorPth)
-		} else {
-			indicator, err = fileModtime(indicatorPth)
+// cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
+func cacheDescriptor(indicatorMap map[string]map[string]bool, method ChangeIndicator) (map[string]map[string]bool, error) {
+	descriptor := map[string]map[string]bool{}
+	for indicatorPth, pthMap := range indicatorMap {
+		for pth := range pthMap {
+			if len(indicatorPth) == 0 {
+				// this file's changes does not fluctuates existing cache invalidation
+				if len(descriptor["-"]) == 0 {
+					descriptor["-"] = map[string]bool{}
+				}
+				descriptor["-"][pth] = true
+				continue
+			}
+			var indicator string
+			var err error
+			if method == MD5 {
+				indicator, err = fileContentHash(indicatorPth)
+			} else {
+				indicator, err = fileModtime(indicatorPth)
+			}
+			if err != nil {
+				return nil, err
+			}
+			if len(descriptor[indicator]) == 0 {
+				descriptor[indicator] = map[string]bool{}
+			}
+
+			descriptor[indicator][pth] = true
 		}
-		if err != nil {
-			return nil, err
-		}
-		descriptor[pth] = indicator
 	}
 	return descriptor, nil
 }
@@ -128,7 +145,7 @@ func fileModtime(pth string) (string, error) {
 }
 
 // readCacheDescriptor reads cache descriptor from pth is exists.
-func readCacheDescriptor(pth string) (map[string]string, error) {
+func readCacheDescriptor(pth string) (map[string]map[string]bool, error) {
 	if exists, err := pathutil.IsPathExists(pth); err != nil {
 		return nil, err
 	} else if !exists {
@@ -140,7 +157,7 @@ func readCacheDescriptor(pth string) (map[string]string, error) {
 		return nil, err
 	}
 
-	var previousFilePathMap map[string]string
+	var previousFilePathMap map[string]map[string]bool
 	err = json.Unmarshal(fileBytes, &previousFilePathMap)
 	if err != nil {
 		return nil, err

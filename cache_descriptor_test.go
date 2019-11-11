@@ -32,7 +32,7 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 
 	t.Log("mod time method")
 	{
-		descriptor, err := cacheDescriptor(map[string]string{filepath.Join(tmpDir, "subdir", "file1"): filepath.Join(tmpDir, "subdir", "file1")}, MODTIME)
+		descriptor, err := cacheDescriptor(map[string]map[string]bool{filepath.Join(tmpDir, "subdir", "file1"): {filepath.Join(tmpDir, "subdir", "file1"): true}}, MODTIME)
 		if err != nil {
 			t.Errorf("cacheDescriptor() error = %v, wantErr %v", err, false)
 			return
@@ -43,7 +43,7 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 			return
 		}
 
-		for _, modTimeStr := range descriptor {
+		for modTimeStr := range descriptor {
 			modTime, err := strconv.Atoi(modTimeStr)
 			if err != nil {
 				t.Errorf("failed to int parse: %s, error: %s", modTimeStr, err)
@@ -53,10 +53,12 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 			if start.Before(mod) || end.After(mod) {
 				t.Errorf("invalid modtime (%v) should be > %v && < %v", mod, start, end)
 				return
+
 			}
 		}
 	}
 }
+
 func Test_cacheDescriptor(t *testing.T) {
 	tmpDir, err := pathutil.NormalizedOSTempDirPath("cache")
 	if err != nil {
@@ -72,30 +74,30 @@ func Test_cacheDescriptor(t *testing.T) {
 	createDirStruct(t, pths)
 
 	tests := []struct {
-		name                string
-		indicatorByCachePth map[string]string
-		method              ChangeIndicator
-		descriptor          map[string]string
-		wantErr             bool
+		name         string
+		indicatorMap map[string]map[string]bool
+		method       ChangeIndicator
+		descriptor   map[string]map[string]bool
+		wantErr      bool
 	}{
 		{
-			name:                "no change indicator",
-			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "file1"): ""},
-			method:              MD5,
-			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "-"},
-			wantErr:             false,
+			name:         "no change indicator",
+			indicatorMap: map[string]map[string]bool{"": {filepath.Join(tmpDir, "subdir", "file1"): true}},
+			method:       MD5,
+			descriptor:   map[string]map[string]bool{"-": {filepath.Join(tmpDir, "subdir", "file1"): true}},
+			wantErr:      false,
 		},
 		{
-			name:                "content hash method",
-			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "file1"): filepath.Join(tmpDir, "subdir", "file2")},
-			method:              MD5,
-			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "d41d8cd98f00b204e9800998ecf8427e"}, // empty string MD5 hash
-			wantErr:             false,
+			name:         "content hash method",
+			indicatorMap: map[string]map[string]bool{filepath.Join(tmpDir, "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1"): true}},
+			method:       MD5,
+			descriptor:   map[string]map[string]bool{"d41d8cd98f00b204e9800998ecf8427e": {filepath.Join(tmpDir, "subdir", "file1"): true}}, // empty string MD5 hash
+			wantErr:      false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			descriptor, err := cacheDescriptor(tt.indicatorByCachePth, tt.method)
+			descriptor, err := cacheDescriptor(tt.indicatorMap, tt.method)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("cacheDescriptor() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -110,69 +112,67 @@ func Test_cacheDescriptor(t *testing.T) {
 func Test_compare(t *testing.T) {
 	tests := []struct {
 		name string
-		old  map[string]string
-		new  map[string]string
+		old  map[string]map[string]bool
+		new  map[string]map[string]bool
 		want result
 	}{
 		{
 			name: "empty test",
-			old:  map[string]string{},
-			new:  map[string]string{},
+			old:  map[string]map[string]bool{},
+			new:  map[string]map[string]bool{},
 			want: result{},
 		},
 		{
 			name: "removed",
-			old:  map[string]string{"pth": "indicator"},
-			new:  map[string]string{},
+			old:  map[string]map[string]bool{"indicator": {"pth": true}},
+			new:  map[string]map[string]bool{},
 			want: result{removed: []string{"pth"}},
 		},
 		{
 			name: "ignored removed",
-			old:  map[string]string{"pth": "-"},
-			new:  map[string]string{},
+			old:  map[string]map[string]bool{"-": {"pth": true}},
+			new:  map[string]map[string]bool{},
 			want: result{removedIgnored: []string{"pth"}},
 		},
 		{
 			name: "changed",
-			old:  map[string]string{"pth": "indicator1"},
-			new:  map[string]string{"pth": "indicator2"},
+			old:  map[string]map[string]bool{"indicator1": {"pth": true}},
+			new:  map[string]map[string]bool{"indicator2": {"pth": true}},
 			want: result{changed: []string{"pth"}},
 		},
 		{
 			name: "matching",
-			old:  map[string]string{"pth": "indicator"},
-			new:  map[string]string{"pth": "indicator"},
+			old:  map[string]map[string]bool{"indicator": {"pth": true}},
+			new:  map[string]map[string]bool{"indicator": {"pth": true}},
 			want: result{matching: []string{"pth"}},
 		},
 		{
 			name: "added",
-			old:  map[string]string{},
-			new:  map[string]string{"pth": "indicator"},
+			old:  map[string]map[string]bool{},
+			new:  map[string]map[string]bool{"indicator": {"pth": true}},
 			want: result{added: []string{"pth"}},
 		},
 		{
 			name: "ignored added",
-			old:  map[string]string{},
-			new:  map[string]string{"pth": "-"},
+			old:  map[string]map[string]bool{},
+			new:  map[string]map[string]bool{"-": {"pth": true}},
 			want: result{addedIgnored: []string{"pth"}},
 		},
 		{
 			name: "complex",
-			old: map[string]string{
-				"removedPth":        "indicator",
-				"ignoredRemovedPth": "-",
-				"changed":           "indicator1",
-				"matching":          "indicator",
+			old: map[string]map[string]bool{
+				"indicator":  {"removedPth": true, "matching": true},
+				"-":          {"ignoredRemovedPth": true},
+				"indicator1": {"changed": true},
 				// "added":             "indicator",
 				// "ignoredAdded":      "-",
 			},
-			new: map[string]string{
+			new: map[string]map[string]bool{
 				// "removedPth":        "indicator",
 				// "ignoredRemovedPth": "-",
-				"changed":      "indicator2",
-				"matching":     "indicator",
-				"added":        "indicator",
-				"ignoredAdded": "-",
+				"indicator2": {"changed": true},
+				"indicator":  {"matching": true, "added": true},
+				"-":          {"ignoredAdded": true},
 			},
 			want: result{
 				removed:        []string{"removedPth"},
@@ -269,8 +269,8 @@ func Test_result_hasChanges(t *testing.T) {
 }
 
 func Test_readCacheDescriptor(t *testing.T) {
-	desired := map[string]string{
-		"pacth/to/cache": "indicator",
+	desired := map[string]map[string]bool{
+		"indicator": {"pacth/to/cache": true},
 	}
 
 	content, err := json.Marshal(desired)
@@ -290,7 +290,7 @@ func Test_readCacheDescriptor(t *testing.T) {
 	tests := []struct {
 		name       string
 		pth        string
-		descriptor map[string]string
+		descriptor map[string]map[string]bool
 		wantErr    bool
 	}{
 		{

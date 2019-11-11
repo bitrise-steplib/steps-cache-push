@@ -19,17 +19,17 @@ import (
 
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
-	glob "github.com/ryanuber/go-glob"
+	"github.com/ryanuber/go-glob"
 )
 
 // parseIncludeListItem separates path to cache and change indicator path.
 func parseIncludeListItem(item string) (string, string) {
-	// file/or/dir/to/cache -> indicator/file
+	// indicator/file -> file/or/dir/to/cache
 	// file/or/dir/to/cache
 	if parts := strings.Split(item, "->"); len(parts) > 1 {
 		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 	}
-	return strings.TrimSpace(item), ""
+	return "", strings.TrimSpace(item)
 }
 
 // parseIgnoreListItem separates ignore pattern and if pattern match removes item from cache or not.
@@ -43,16 +43,20 @@ func parseIgnoreListItem(item string) (string, bool) {
 	return strings.TrimPrefix(item, "!"), false
 }
 
-func parseIncludeList(list []string) map[string]string {
-	indicatorByPath := map[string]string{}
+func parseIncludeList(list []string) map[string]map[string]bool {
+	indicatorMap := map[string]map[string]bool{}
 	for _, item := range list {
-		pth, indicator := parseIncludeListItem(item)
+		indicator, pth := parseIncludeListItem(item)
 		if len(pth) == 0 {
 			continue
 		}
-		indicatorByPath[pth] = indicator
+
+		if len(indicatorMap[indicator]) == 0 {
+			indicatorMap[indicator] = map[string]bool{}
+		}
+		indicatorMap[indicator][pth] = true
 	}
-	return indicatorByPath
+	return indicatorMap
 }
 
 func parseIgnoreList(list []string) map[string]bool {
@@ -109,13 +113,13 @@ func expandPath(root string) (regularFiles []string, symlinkPaths []string, err 
 	return regularFiles, symlinkPaths, nil
 }
 
-// normalizeIndicatorByPath modifies indicatorByPath:
+// normalizeIndicatorByPath modifies indicatorMap:
 // expands both path to cache and indicator path
 // removes the item if any of path to cache or indicator path is not exist or if the indicator is a dir
 // replaces path to cache (if it is a directory) by every file (recursively) in the directory.
-func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]string, error) {
-	normalized := map[string]string{}
-	for pth, indicator := range indicatorByPath {
+func normalizeIndicatorByPath(indicatorMap map[string]map[string]bool) (map[string]map[string]bool, error) {
+	normalized := map[string]map[string]bool{}
+	for indicator, pthMap := range indicatorMap {
 		if len(indicator) > 0 {
 			var err error
 			indicator, err = pathutil.AbsPath(indicator)
@@ -135,32 +139,41 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			}
 		}
 
-		var err error
-		pth, err = pathutil.AbsPath(pth)
-		if err != nil {
-			return nil, err
+		for pth := range pthMap {
+			var err error
+			pth, err := pathutil.AbsPath(pth)
+			if err != nil {
+				return nil, err
+			}
+
+			exist, err := pathutil.IsPathExists(pth)
+			if err != nil {
+				return nil, err
+			}
+			if !exist {
+				log.Warnf("path does not exists at: %s", pth)
+				continue
+			}
+
+			regularFiles, symlinkPaths, err := expandPath(pth)
+			if err != nil {
+				return nil, err
+			}
+			for _, file := range regularFiles {
+				if len(normalized[indicator]) == 0 {
+					normalized[indicator] = map[string]bool{}
+				}
+				normalized[indicator][file] = true
+			}
+			for _, file := range symlinkPaths {
+				// this file's changes does not fluctuates existing cache invalidation
+				if len(normalized["-"]) == 0 {
+					normalized["-"] = map[string]bool{}
+				}
+				normalized["-"][file] = true
+			}
 		}
 
-		exist, err := pathutil.IsPathExists(pth)
-		if err != nil {
-			return nil, err
-		}
-		if !exist {
-			log.Warnf("path does not exists at: %s", pth)
-			continue
-		}
-
-		regularFiles, symlinkPaths, err := expandPath(pth)
-		if err != nil {
-			return nil, err
-		}
-		for _, file := range regularFiles {
-			normalized[file] = indicator
-		}
-		for _, file := range symlinkPaths {
-			// this file's changes does not fluctuates existing cache invalidation
-			normalized[file] = "-"
-		}
 	}
 	return normalized, nil
 }
@@ -201,26 +214,31 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 // Otherwise a path will affect the previous cache invalidation:
 // if the path has indicator, the indicator will affect the previous cache invalidation
 // otherwise the file itself.
-func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) (map[string]string, error) {
-	indicatorByCachePth := map[string]string{}
+func interleave(indicatorMap map[string]map[string]bool, excludeByPattern map[string]bool) (map[string]map[string]bool, error) {
+	indicatorMapByCache := map[string]map[string]bool{}
 
-	for pth, indicator := range indicatorByPth {
-		skip, exclude := match(pth, excludeByPattern)
-		if exclude {
-			// this file should not be included in the cache
-			continue
+	for indicator, pthMap := range indicatorMap {
+		for pth := range pthMap {
+			skip, exclude := match(pth, excludeByPattern)
+			if exclude {
+				// this file should not be included in the cache
+				continue
+			}
+
+			if skip || indicator == "-" {
+				// this file's changes does not fluctuates existing cache invalidation
+				indicator = ""
+			} else if len(indicator) == 0 {
+				// the file's own content fluctuates existing cache invalidation
+				indicator = pth
+			} // else: the file's indicator content fluctuates existing cache invalidation
+
+			if len(indicatorMapByCache[indicator]) == 0 {
+				indicatorMapByCache[indicator] = map[string]bool{}
+			}
+			indicatorMapByCache[indicator][pth] = true
 		}
-
-		if skip || indicator == "-" {
-			// this file's changes does not fluctuates existing cache invalidation
-			indicator = ""
-		} else if len(indicator) == 0 {
-			// the file's own content fluctuates existing cache invalidation
-			indicator = pth
-		} // else: the file's indicator content fluctuates existing cache invalidation
-
-		indicatorByCachePth[pth] = indicator
 	}
 
-	return indicatorByCachePth, nil
+	return indicatorMapByCache, nil
 }
