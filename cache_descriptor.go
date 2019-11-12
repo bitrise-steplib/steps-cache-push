@@ -145,7 +145,7 @@ func fileModtime(pth string) (string, error) {
 }
 
 // readCacheDescriptor reads cache descriptor from pth is exists.
-func readCacheDescriptor(pth string) (map[string]map[string]bool, error) {
+func readCacheDescriptor(pth string) (map[string]string, error) {
 	if exists, err := pathutil.IsPathExists(pth); err != nil {
 		return nil, err
 	} else if !exists {
@@ -157,11 +157,37 @@ func readCacheDescriptor(pth string) (map[string]map[string]bool, error) {
 		return nil, err
 	}
 
-	var previousFilePathMap map[string]map[string]bool
+	var previousFilePathMap map[string]string
 	err = json.Unmarshal(fileBytes, &previousFilePathMap)
 	if err != nil {
 		return nil, err
 	}
 
 	return previousFilePathMap, nil
+}
+
+// convertDescriptorToIndicatorMap converts the descriptor to an indicator map (from path(S) - indicator(S) to
+// indicator(S) - paths(M)).
+func convertDescriptorToIndicatorMap(indicatorByPth map[string]string) map[string]map[string]bool {
+	var indicatorMap = map[string]map[string]bool{}
+	for pth, indicator := range indicatorByPth {
+		if indicatorMap[indicator] == nil {
+			indicatorMap[indicator] = map[string]bool{pth: true}
+		} else {
+			indicatorMap[indicator][pth] = true
+		}
+	}
+	return indicatorMap
+}
+
+// convertDescriptorToIndicatorByPath converts to an indicator by path map (from indicator(S) - paths(M) to
+// path(S) - indicator(S))
+func convertDescriptorToIndicatorByPath(indicatorMap map[string]map[string]bool) map[string]string {
+	var indicatorByPth = map[string]string{}
+	for indicator, pthmap := range indicatorMap {
+		for pth := range pthmap {
+			indicatorByPth[pth] = indicator
+		}
+	}
+	return indicatorByPth
 }

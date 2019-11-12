@@ -269,8 +269,8 @@ func Test_result_hasChanges(t *testing.T) {
 }
 
 func Test_readCacheDescriptor(t *testing.T) {
-	desired := map[string]map[string]bool{
-		"indicator": {"pacth/to/cache": true},
+	desired := map[string]string{
+		"path/to/cache": "indicator",
 	}
 
 	content, err := json.Marshal(desired)
@@ -290,7 +290,7 @@ func Test_readCacheDescriptor(t *testing.T) {
 	tests := []struct {
 		name       string
 		pth        string
-		descriptor map[string]map[string]bool
+		descriptor map[string]string
 		wantErr    bool
 	}{
 		{
