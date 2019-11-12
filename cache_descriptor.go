@@ -85,29 +85,22 @@ func transformToIndicatorByPth(indicatorMap map[string]map[string]bool) map[stri
 func cacheDescriptor(indicatorMap map[string]map[string]bool, method ChangeIndicator) (map[string]map[string]bool, error) {
 	descriptor := map[string]map[string]bool{}
 	for indicatorPth, pthMap := range indicatorMap {
+		var indicator string
+		var err error
+		if len(indicatorPth) == 0 {
+			indicator = "-"
+		} else if method == MD5 {
+			indicator, err = fileContentHash(indicatorPth)
+		} else {
+			indicator, err = fileModtime(indicatorPth)
+		}
+		if err != nil {
+			return nil, err
+		}
 		for pth := range pthMap {
-			if len(indicatorPth) == 0 {
-				// this file's changes does not fluctuates existing cache invalidation
-				if len(descriptor["-"]) == 0 {
-					descriptor["-"] = map[string]bool{}
-				}
-				descriptor["-"][pth] = true
-				continue
-			}
-			var indicator string
-			var err error
-			if method == MD5 {
-				indicator, err = fileContentHash(indicatorPth)
-			} else {
-				indicator, err = fileModtime(indicatorPth)
-			}
-			if err != nil {
-				return nil, err
-			}
 			if len(descriptor[indicator]) == 0 {
 				descriptor[indicator] = map[string]bool{}
 			}
-
 			descriptor[indicator][pth] = true
 		}
 	}
