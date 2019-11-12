@@ -39,7 +39,7 @@ func (r result) hasChanges() bool {
 }
 
 // compare compares two cache descriptor file and return the differences.
-func compare(old map[string]map[string]bool, new map[string]map[string]bool) (r result) {
+func compare(old map[string][]string, new map[string][]string) (r result) {
 	oldCopy := transformToIndicatorByPth(old)
 	newCopy := transformToIndicatorByPth(new)
 
@@ -71,10 +71,10 @@ func compare(old map[string]map[string]bool, new map[string]map[string]bool) (r 
 }
 
 // transformToIndicatorByPth transforms an indicator map to an indicatorByPth map.
-func transformToIndicatorByPth(indicatorMap map[string]map[string]bool) map[string]string {
+func transformToIndicatorByPth(indicatorMap map[string][]string) map[string]string {
 	var indicatorByPth = map[string]string{}
-	for indicator, pthMap := range indicatorMap {
-		for pth := range pthMap {
+	for indicator, pths := range indicatorMap {
+		for _, pth := range pths {
 			indicatorByPth[pth] = indicator
 		}
 	}
@@ -82,9 +82,9 @@ func transformToIndicatorByPth(indicatorMap map[string]map[string]bool) map[stri
 }
 
 // cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
-func cacheDescriptor(indicatorMap map[string]map[string]bool, method ChangeIndicator) (map[string]map[string]bool, error) {
-	descriptor := map[string]map[string]bool{}
-	for indicatorPth, pthMap := range indicatorMap {
+func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (map[string][]string, error) {
+	descriptor := map[string][]string{}
+	for indicatorPth, pths := range indicatorMap {
 		var indicator string
 		var err error
 		if len(indicatorPth) == 0 {
@@ -97,11 +97,8 @@ func cacheDescriptor(indicatorMap map[string]map[string]bool, method ChangeIndic
 		if err != nil {
 			return nil, err
 		}
-		for pth := range pthMap {
-			if len(descriptor[indicator]) == 0 {
-				descriptor[indicator] = map[string]bool{}
-			}
-			descriptor[indicator][pth] = true
+		for _, pth := range pths {
+			descriptor[indicator] = append(descriptor[indicator], pth)
 		}
 	}
 	return descriptor, nil
@@ -161,24 +158,20 @@ func readCacheDescriptor(pth string) (map[string]string, error) {
 
 // convertDescriptorToIndicatorMap converts the descriptor to an indicator map (from path(S) - indicator(S) to
 // indicator(S) - paths(M)).
-func convertDescriptorToIndicatorMap(indicatorByPth map[string]string) map[string]map[string]bool {
-	var indicatorMap = map[string]map[string]bool{}
+func convertDescriptorToIndicatorMap(indicatorByPth map[string]string) map[string][]string {
+	var indicatorMap = map[string][]string{}
 	for pth, indicator := range indicatorByPth {
-		if indicatorMap[indicator] == nil {
-			indicatorMap[indicator] = map[string]bool{pth: true}
-		} else {
-			indicatorMap[indicator][pth] = true
-		}
+		indicatorMap[indicator] = append(indicatorMap[indicator], pth)
 	}
 	return indicatorMap
 }
 
 // convertDescriptorToIndicatorByPath converts to an indicator by path map (from indicator(S) - paths(M) to
 // path(S) - indicator(S))
-func convertDescriptorToIndicatorByPath(indicatorMap map[string]map[string]bool) map[string]string {
+func convertDescriptorToIndicatorByPath(indicatorMap map[string][]string) map[string]string {
 	var indicatorByPth = map[string]string{}
-	for indicator, pthmap := range indicatorMap {
-		for pth := range pthmap {
+	for indicator, pths := range indicatorMap {
+		for _, pth := range pths {
 			indicatorByPth[pth] = indicator
 		}
 	}

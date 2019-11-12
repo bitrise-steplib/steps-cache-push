@@ -43,18 +43,14 @@ func parseIgnoreListItem(item string) (string, bool) {
 	return strings.TrimPrefix(item, "!"), false
 }
 
-func parseIncludeList(list []string) map[string]map[string]bool {
-	indicatorMap := map[string]map[string]bool{}
+func parseIncludeList(list []string) map[string][]string {
+	indicatorMap := map[string][]string{}
 	for _, item := range list {
 		indicator, pth := parseIncludeListItem(item)
 		if len(pth) == 0 {
 			continue
 		}
-
-		if len(indicatorMap[indicator]) == 0 {
-			indicatorMap[indicator] = map[string]bool{}
-		}
-		indicatorMap[indicator][pth] = true
+		indicatorMap[indicator] = append(indicatorMap[indicator], pth)
 	}
 	return indicatorMap
 }
@@ -117,9 +113,9 @@ func expandPath(root string) (regularFiles []string, symlinkPaths []string, err 
 // expands both path to cache and indicator path
 // removes the item if any of path to cache or indicator path is not exist or if the indicator is a dir
 // replaces path to cache (if it is a directory) by every file (recursively) in the directory.
-func normalizeIndicatorByPath(indicatorMap map[string]map[string]bool) (map[string]map[string]bool, error) {
-	normalized := map[string]map[string]bool{}
-	for indicator, pthMap := range indicatorMap {
+func normalizeIndicatorByPath(indicatorMap map[string][]string) (map[string][]string, error) {
+	normalized := map[string][]string{}
+	for indicator, pths := range indicatorMap {
 		if len(indicator) > 0 {
 			var err error
 			indicator, err = pathutil.AbsPath(indicator)
@@ -139,7 +135,7 @@ func normalizeIndicatorByPath(indicatorMap map[string]map[string]bool) (map[stri
 			}
 		}
 
-		for pth := range pthMap {
+		for _, pth := range pths {
 			var err error
 			pth, err := pathutil.AbsPath(pth)
 			if err != nil {
@@ -160,17 +156,11 @@ func normalizeIndicatorByPath(indicatorMap map[string]map[string]bool) (map[stri
 				return nil, err
 			}
 			for _, file := range regularFiles {
-				if len(normalized[indicator]) == 0 {
-					normalized[indicator] = map[string]bool{}
-				}
-				normalized[indicator][file] = true
+				normalized[indicator] = append(normalized[indicator], file)
 			}
 			for _, file := range symlinkPaths {
 				// this file's changes does not fluctuates existing cache invalidation
-				if len(normalized["-"]) == 0 {
-					normalized["-"] = map[string]bool{}
-				}
-				normalized["-"][file] = true
+				normalized["-"] = append(normalized["-"], file)
 			}
 		}
 
@@ -214,11 +204,11 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 // Otherwise a path will affect the previous cache invalidation:
 // if the path has indicator, the indicator will affect the previous cache invalidation
 // otherwise the file itself.
-func interleave(indicatorMap map[string]map[string]bool, excludeByPattern map[string]bool) (map[string]map[string]bool, error) {
-	indicatorMapByCache := map[string]map[string]bool{}
+func interleave(indicatorMap map[string][]string, excludeByPattern map[string]bool) (map[string][]string, error) {
+	indicatorMapByCache := map[string][]string{}
 
-	for indicator, pthMap := range indicatorMap {
-		for pth := range pthMap {
+	for indicator, pths := range indicatorMap {
+		for _, pth := range pths {
 			skip, exclude := match(pth, excludeByPattern)
 			if exclude {
 				// this file should not be included in the cache
@@ -232,11 +222,7 @@ func interleave(indicatorMap map[string]map[string]bool, excludeByPattern map[st
 				// the file's own content fluctuates existing cache invalidation
 				indicator = pth
 			} // else: the file's indicator content fluctuates existing cache invalidation
-
-			if len(indicatorMapByCache[indicator]) == 0 {
-				indicatorMapByCache[indicator] = map[string]bool{}
-			}
-			indicatorMapByCache[indicator][pth] = true
+			indicatorMapByCache[indicator] = append(indicatorMapByCache[indicator], pth)
 		}
 	}
 

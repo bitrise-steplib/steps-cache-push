@@ -170,27 +170,27 @@ func Test_parseIncludeList(t *testing.T) {
 	tests := []struct {
 		name         string
 		list         []string
-		indicatorMap map[string]map[string]bool
+		indicatorMap map[string][]string
 	}{
 		{
 			name:         "simple include list",
 			list:         []string{"path1/to/include", "indicator/path->path2/to/include"},
-			indicatorMap: map[string]map[string]bool{"": {"path1/to/include": true}, "indicator/path": {"path2/to/include": true}},
+			indicatorMap: map[string][]string{"": {"path1/to/include"}, "indicator/path": {"path2/to/include"}},
 		},
 		{
 			name:         "duplicated include items",
 			list:         []string{"path/to/include", "indicator/path->path/to/include"},
-			indicatorMap: map[string]map[string]bool{"": {"path/to/include": true}, "indicator/path": {"path/to/include": true}},
+			indicatorMap: map[string][]string{"": {"path/to/include"}, "indicator/path": {"path/to/include"}},
 		},
 		{
 			name:         "empty item",
 			list:         []string{"", "indicator/path->path/to/include"},
-			indicatorMap: map[string]map[string]bool{"indicator/path": {"path/to/include": true}},
+			indicatorMap: map[string][]string{"indicator/path": {"path/to/include"}},
 		},
 		{
 			name:         "empty path",
 			list:         []string{"indicator/path->", "indicator/path->path/to/include"},
-			indicatorMap: map[string]map[string]bool{"indicator/path": {"path/to/include": true}},
+			indicatorMap: map[string][]string{"indicator/path": {"path/to/include"}},
 		},
 	}
 	for _, tt := range tests {
@@ -380,54 +380,54 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		indicatorMap map[string]map[string]bool
-		normalized   map[string]map[string]bool
+		indicatorMap map[string][]string
+		normalized   map[string][]string
 		wantErr      bool
 	}{
 		{
 			name:         "drops item if indicator does not exists",
-			indicatorMap: map[string]map[string]bool{"non/existing/indicator": {filepath.Join(tmpDir, "subdir", "file1"): true}},
-			normalized:   map[string]map[string]bool{},
+			indicatorMap: map[string][]string{"non/existing/indicator": {filepath.Join(tmpDir, "subdir", "file1")}},
+			normalized:   map[string][]string{},
 			wantErr:      false,
 		},
 		{
 			name:         "drops item if indicator is a dir",
-			indicatorMap: map[string]map[string]bool{filepath.Join(tmpDir, "subdir"): {filepath.Join(tmpDir, "subdir", "file1"): true}},
-			normalized:   map[string]map[string]bool{},
+			indicatorMap: map[string][]string{filepath.Join(tmpDir, "subdir"): {filepath.Join(tmpDir, "subdir", "file1")}},
+			normalized:   map[string][]string{},
 			wantErr:      false,
 		},
 		{
 			name:         "expand envs in indicator",
-			indicatorMap: map[string]map[string]bool{filepath.Join("$NORMALIZE_INDICATOR_BY_PATH_TMP_DIR", "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1"): true}},
-			normalized:   map[string]map[string]bool{filepath.Join(tmpDir, "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1"): true}},
+			indicatorMap: map[string][]string{filepath.Join("$NORMALIZE_INDICATOR_BY_PATH_TMP_DIR", "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1")}},
+			normalized:   map[string][]string{filepath.Join(tmpDir, "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1")}},
 			wantErr:      false,
 		},
 		{
 			name:         "drops item if path does not exists",
-			indicatorMap: map[string]map[string]bool{"": {"non/existing/path": true}},
-			normalized:   map[string]map[string]bool{},
+			indicatorMap: map[string][]string{"": {"non/existing/path"}},
+			normalized:   map[string][]string{},
 			wantErr:      false,
 		},
 		{
 			name:         "expand envs in path",
-			indicatorMap: map[string]map[string]bool{"": {filepath.Join("$NORMALIZE_INDICATOR_BY_PATH_TMP_DIR", "subdir", "file1"): true}},
-			normalized:   map[string]map[string]bool{"": {filepath.Join(tmpDir, "subdir", "file1"): true}},
+			indicatorMap: map[string][]string{"": {filepath.Join("$NORMALIZE_INDICATOR_BY_PATH_TMP_DIR", "subdir", "file1")}},
+			normalized:   map[string][]string{"": {filepath.Join(tmpDir, "subdir", "file1")}},
 			wantErr:      false,
 		},
 		{
 			name:         "expands path if it is a dir",
-			indicatorMap: map[string]map[string]bool{"": {filepath.Join(tmpDir, "subdir"): true}},
-			normalized: map[string]map[string]bool{
-				"": {filepath.Join(tmpDir, "subdir", "file1"): true,
-					filepath.Join(tmpDir, "subdir", "file2"): true}},
+			indicatorMap: map[string][]string{"": {filepath.Join(tmpDir, "subdir")}},
+			normalized: map[string][]string{
+				"": {filepath.Join(tmpDir, "subdir", "file1"),
+					filepath.Join(tmpDir, "subdir", "file2")}},
 			wantErr: false,
 		},
 		{
 			name:         "set symlink indicator to ignore file for cache invalidation",
-			indicatorMap: map[string]map[string]bool{"": {filepath.Join(tmpDir, "dir_with_symlink"): true}},
-			normalized: map[string]map[string]bool{
-				"":  {filepath.Join(tmpDir, "dir_with_symlink", "file"): true},
-				"-": {linkFilePath: true, linkDirPath: true, invalidTargetLinkPath: true},
+			indicatorMap: map[string][]string{"": {filepath.Join(tmpDir, "dir_with_symlink")}},
+			normalized: map[string][]string{
+				"":  {filepath.Join(tmpDir, "dir_with_symlink", "file")},
+				"-": {linkDirPath, linkFilePath, invalidTargetLinkPath},
 			},
 		},
 	}
@@ -551,37 +551,37 @@ func Test_match(t *testing.T) {
 func Test_interleave(t *testing.T) {
 	tests := []struct {
 		name                string
-		indicatorMap        map[string]map[string]bool
+		indicatorMap        map[string][]string
 		excludeByPattern    map[string]bool
-		indicatorByCachePth map[string]map[string]bool
+		indicatorByCachePth map[string][]string
 		wantErr             bool
 	}{
 		{
 			name:                "no indicator, own content is the indicator",
-			indicatorMap:        map[string]map[string]bool{"": {"path/to/cache": true}},
+			indicatorMap:        map[string][]string{"": {"path/to/cache"}},
 			excludeByPattern:    map[string]bool{},
-			indicatorByCachePth: map[string]map[string]bool{"path/to/cache": {"path/to/cache": true}},
+			indicatorByCachePth: map[string][]string{"path/to/cache": {"path/to/cache"}},
 			wantErr:             false,
 		},
 		{
 			name:                "no ignore match",
-			indicatorMap:        map[string]map[string]bool{"indicator/path": {"path/to/cache": true}},
+			indicatorMap:        map[string][]string{"indicator/path": {"path/to/cache"}},
 			excludeByPattern:    map[string]bool{"path/to/include": false},
-			indicatorByCachePth: map[string]map[string]bool{"indicator/path": {"path/to/cache": true}},
+			indicatorByCachePth: map[string][]string{"indicator/path": {"path/to/cache"}},
 			wantErr:             false,
 		},
 		{
 			name:                "ignore match, do not track changes",
-			indicatorMap:        map[string]map[string]bool{"indicator/path": {"path/to/cache": true}},
+			indicatorMap:        map[string][]string{"indicator/path": {"path/to/cache"}},
 			excludeByPattern:    map[string]bool{"path/to": false},
-			indicatorByCachePth: map[string]map[string]bool{"": {"path/to/cache": true}},
+			indicatorByCachePth: map[string][]string{"": {"path/to/cache"}},
 			wantErr:             false,
 		},
 		{
 			name:                "exclude match, remove",
-			indicatorMap:        map[string]map[string]bool{"indicator/path": {"path/to/cache": true}},
+			indicatorMap:        map[string][]string{"indicator/path": {"path/to/cache"}},
 			excludeByPattern:    map[string]bool{"path/to": true},
-			indicatorByCachePth: map[string]map[string]bool{},
+			indicatorByCachePth: map[string][]string{},
 			wantErr:             false,
 		},
 	}
