@@ -155,7 +155,7 @@ func normalizeIndicatorByPath(indicatorMap map[string][]string) (map[string][]st
 			if err != nil {
 				return nil, err
 			}
-			normalized[indicator] = regularFiles
+			normalized[indicator] = append(normalized[indicator], regularFiles...)
 			for _, file := range symlinkPaths {
 				// this file's changes does not fluctuates existing cache invalidation
 				normalized["-"] = append(normalized["-"], file)

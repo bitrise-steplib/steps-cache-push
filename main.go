@@ -148,8 +148,8 @@ func main() {
 	}
 
 	var pths []string
-	for _, pths := range indicatorMap {
-		for _, pth := range pths {
+	for _, pp := range indicatorMap {
+		for _, pth := range pp {
 			pths = append(pths, pth)
 		}
 	}
