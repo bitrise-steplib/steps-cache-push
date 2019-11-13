@@ -47,13 +47,13 @@ func main() {
 
 	log.Infof("Cleaning paths")
 
-	indicatorMap := parseIncludeList(strings.Split(configs.Paths, "\n"))
-	if len(indicatorMap) == 0 {
+	indicatorByPth := parseIncludeList(strings.Split(configs.Paths, "\n"))
+	if len(indicatorByPth) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
 
-	indicatorMap, err = normalizeIndicatorByPath(indicatorMap)
+	indicatorByPth, err = normalizeIndicatorByPath(indicatorByPth)
 	if err != nil {
 		logErrorfAndExit("Failed to parse include list: %s", err)
 	}
@@ -64,14 +64,14 @@ func main() {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
-	indicatorMap, err = interleave(indicatorMap, excludeByPattern)
+	indicatorByPth, err = interleave(indicatorByPth, excludeByPattern)
 	if err != nil {
 		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
 	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
-	if len(indicatorMap) == 0 {
+	if len(indicatorByPth) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
@@ -92,7 +92,7 @@ func main() {
 		log.Printf("No previous cache info found")
 	}
 	convertedPrevDescriptor := convertDescriptorToIndicatorMap(prevDescriptor)
-
+	indicatorMap := convertDescriptorToIndicatorMap(indicatorByPth)
 	curDescriptor, err := cacheDescriptor(indicatorMap, ChangeIndicator(configs.FingerprintMethodID))
 	if err != nil {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
