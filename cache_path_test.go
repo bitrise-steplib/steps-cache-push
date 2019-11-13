@@ -584,6 +584,13 @@ func Test_interleave(t *testing.T) {
 			indicatorByCachePth: map[string][]string{},
 			wantErr:             false,
 		},
+		{
+			name:                "no indicator, own content is the indicator",
+			indicatorMap:        map[string][]string{"": {"path/to/cache", "path/to/cache2"}},
+			excludeByPattern:    map[string]bool{},
+			indicatorByCachePth: map[string][]string{"path/to/cache": {"path/to/cache"}, "path/to/cache2": {"path/to/cache2"}},
+			wantErr:             false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

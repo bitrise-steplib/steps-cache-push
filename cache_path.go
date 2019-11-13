@@ -155,9 +155,7 @@ func normalizeIndicatorByPath(indicatorMap map[string][]string) (map[string][]st
 			if err != nil {
 				return nil, err
 			}
-			for _, file := range regularFiles {
-				normalized[indicator] = append(normalized[indicator], file)
-			}
+			normalized[indicator] = regularFiles
 			for _, file := range symlinkPaths {
 				// this file's changes does not fluctuates existing cache invalidation
 				normalized["-"] = append(normalized["-"], file)
@@ -215,14 +213,18 @@ func interleave(indicatorMap map[string][]string, excludeByPattern map[string]bo
 				continue
 			}
 
+			var curIndicator string
 			if skip || indicator == "-" {
 				// this file's changes does not fluctuates existing cache invalidation
-				indicator = ""
+				curIndicator = ""
 			} else if len(indicator) == 0 {
 				// the file's own content fluctuates existing cache invalidation
-				indicator = pth
-			} // else: the file's indicator content fluctuates existing cache invalidation
-			indicatorMapByCache[indicator] = append(indicatorMapByCache[indicator], pth)
+				curIndicator = pth
+			} else {
+				// the file's indicator content fluctuates existing cache invalidation
+				curIndicator = indicator
+			}
+			indicatorMapByCache[curIndicator] = append(indicatorMapByCache[curIndicator], pth)
 		}
 	}
 

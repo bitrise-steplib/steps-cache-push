@@ -40,8 +40,8 @@ func (r result) hasChanges() bool {
 
 // compare compares two cache descriptor file and return the differences.
 func compare(old map[string][]string, new map[string][]string) (r result) {
-	oldCopy := transformToIndicatorByPth(old)
-	newCopy := transformToIndicatorByPth(new)
+	oldCopy := convertDescriptorToIndicatorByPath(old)
+	newCopy := convertDescriptorToIndicatorByPath(new)
 
 	for oldPth, oldIndicator := range oldCopy {
 		newIndicator, ok := newCopy[oldPth]
@@ -68,17 +68,6 @@ func compare(old map[string][]string, new map[string][]string) (r result) {
 	}
 
 	return
-}
-
-// transformToIndicatorByPth transforms an indicator map to an indicatorByPth map.
-func transformToIndicatorByPth(indicatorMap map[string][]string) map[string]string {
-	var indicatorByPth = map[string]string{}
-	for indicator, pths := range indicatorMap {
-		for _, pth := range pths {
-			indicatorByPth[pth] = indicator
-		}
-	}
-	return indicatorByPth
 }
 
 // cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
