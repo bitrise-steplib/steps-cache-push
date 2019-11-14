@@ -47,13 +47,13 @@ func main() {
 
 	log.Infof("Cleaning paths")
 
-	indicatorByPth := parseIncludeList(strings.Split(configs.Paths, "\n"))
-	if len(indicatorByPth) == 0 {
+	pathToIndicator := parseIncludeList(strings.Split(configs.Paths, "\n"))
+	if len(pathToIndicator) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
 
-	indicatorByPth, err = normalizeIndicatorByPath(indicatorByPth)
+	pathToIndicator, err = normalizeIndicatorByPath(pathToIndicator)
 	if err != nil {
 		logErrorfAndExit("Failed to parse include list: %s", err)
 	}
@@ -64,14 +64,14 @@ func main() {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
-	indicatorByPth, err = interleave(indicatorByPth, excludeByPattern)
+	pathToIndicator, err = interleave(pathToIndicator, excludeByPattern)
 	if err != nil {
 		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
 	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
-	if len(indicatorByPth) == 0 {
+	if len(pathToIndicator) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
@@ -91,9 +91,9 @@ func main() {
 	} else {
 		log.Printf("No previous cache info found")
 	}
-	convertedPrevDescriptor := convertDescriptorToIndicatorMap(prevDescriptor)
-	indicatorMap := convertDescriptorToIndicatorMap(indicatorByPth)
-	curDescriptor, err := cacheDescriptor(indicatorMap, ChangeIndicator(configs.FingerprintMethodID))
+
+	indicatorToPath := convertDescriptorToIndicatorMap(pathToIndicator)
+	curDescriptor, err := cacheDescriptor(indicatorToPath, ChangeIndicator(configs.FingerprintMethodID))
 	if err != nil {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
 	}
@@ -112,7 +112,7 @@ func main() {
 			}
 		}
 
-		result := compare(convertedPrevDescriptor, curDescriptor)
+		result := compare(prevDescriptor, curDescriptor)
 
 		log.Warnf("Previous cache is invalid, new cache will be generated:")
 		log.Warnf("%d files needs to be removed", len(result.removed))
@@ -156,11 +156,11 @@ func main() {
 		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
 	}
 
-	if err := archive.Write(indicatorByPth); err != nil {
+	if err := archive.Write(pathToIndicator); err != nil {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
 
-	if err := archive.WriteHeader(convertDescriptorToIndicatorByPath(curDescriptor), cacheInfoFilePath); err != nil {
+	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
 		logErrorfAndExit("Failed to write archive header: %s", err)
 	}
 

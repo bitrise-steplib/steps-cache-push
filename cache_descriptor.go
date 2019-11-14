@@ -39,12 +39,9 @@ func (r result) hasChanges() bool {
 }
 
 // compare compares two cache descriptor file and return the differences.
-func compare(old map[string][]string, new map[string][]string) (r result) {
-	oldCopy := convertDescriptorToIndicatorByPath(old)
-	newCopy := convertDescriptorToIndicatorByPath(new)
-
-	for oldPth, oldIndicator := range oldCopy {
-		newIndicator, ok := newCopy[oldPth]
+func compare(prevPathToIndicator map[string]string, currentPathToIndicator map[string]string) (r result) {
+	for oldPth, oldIndicator := range prevPathToIndicator {
+		newIndicator, ok := currentPathToIndicator[oldPth]
 		switch {
 		case !ok && oldIndicator == "-":
 			r.removedIgnored = append(r.removedIgnored, oldPth)
@@ -56,10 +53,10 @@ func compare(old map[string][]string, new map[string][]string) (r result) {
 			r.matching = append(r.matching, oldPth)
 		}
 
-		delete(newCopy, oldPth)
+		delete(currentPathToIndicator, oldPth)
 	}
 
-	for newPth, newIndicator := range newCopy {
+	for newPth, newIndicator := range currentPathToIndicator {
 		if newIndicator == "-" {
 			r.addedIgnored = append(r.addedIgnored, newPth)
 		} else {
@@ -71,8 +68,8 @@ func compare(old map[string][]string, new map[string][]string) (r result) {
 }
 
 // cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
-func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (map[string][]string, error) {
-	descriptor := map[string][]string{}
+func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (map[string]string, error) {
+	pathToIndicator := map[string]string{}
 	for indicatorPth, pths := range indicatorMap {
 		var indicator string
 		var err error
@@ -88,9 +85,11 @@ func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (
 			return nil, err
 		}
 
-		descriptor[indicator] = pths
+		for _, pth := range pths {
+			pathToIndicator[pth] = indicator
+		}
 	}
-	return descriptor, nil
+	return pathToIndicator, nil
 }
 
 // fileContentHash returns file's md5 content hash.
@@ -146,24 +145,12 @@ func readCacheDescriptor(pth string) (map[string]string, error) {
 	return previousFilePathMap, nil
 }
 
-// convertDescriptorToIndicatorMap converts the descriptor to an indicator map (from path(S) - indicator(S) to
-// indicator(S) - paths(M)).
+// convertDescriptorToIndicatorMap converts the descriptor to an indicator map (from path - indicator to
+// indicator - paths slice.
 func convertDescriptorToIndicatorMap(indicatorByPth map[string]string) map[string][]string {
 	var indicatorMap = map[string][]string{}
 	for pth, indicator := range indicatorByPth {
 		indicatorMap[indicator] = append(indicatorMap[indicator], pth)
 	}
 	return indicatorMap
-}
-
-// convertDescriptorToIndicatorByPath converts to an indicator by path map (from indicator(S) - paths(M) to
-// path(S) - indicator(S))
-func convertDescriptorToIndicatorByPath(indicatorMap map[string][]string) map[string]string {
-	var indicatorByPth = map[string]string{}
-	for indicator, pths := range indicatorMap {
-		for _, pth := range pths {
-			indicatorByPth[pth] = indicator
-		}
-	}
-	return indicatorByPth
 }
