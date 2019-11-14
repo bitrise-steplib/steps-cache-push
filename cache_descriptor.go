@@ -68,26 +68,35 @@ func compare(prevPathToIndicator map[string]string, currentPathToIndicator map[s
 }
 
 // cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
-func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (map[string]string, error) {
+func cacheDescriptor(pathToIndicatorFile map[string]string, method ChangeIndicator) (map[string]string, error) {
+	indicatorPathToIndicator := map[string]string{}
 	pathToIndicator := map[string]string{}
-	for indicatorPth, pths := range indicatorMap {
+
+	for path, indicatorPath := range pathToIndicatorFile {
+		if len(indicatorPath) == 0 {
+			// this file's changes does not fluctuates existing cache invalidation
+			pathToIndicator[path] = "-"
+			continue
+		}
+
+		indicatorValue, ok := indicatorPathToIndicator[indicatorPath]
+		if ok {
+			pathToIndicator[path] = indicatorValue
+			continue
+		}
+
 		var indicator string
 		var err error
-		if len(indicatorPth) == 0 {
-			// this file's changes does not fluctuates existing cache invalidation
-			indicator = "-"
-		} else if method == MD5 {
-			indicator, err = fileContentHash(indicatorPth)
+		if method == MD5 {
+			indicator, err = fileContentHash(indicatorPath)
 		} else {
-			indicator, err = fileModtime(indicatorPth)
+			indicator, err = fileModtime(indicatorPath)
 		}
 		if err != nil {
 			return nil, err
 		}
 
-		for _, pth := range pths {
-			pathToIndicator[pth] = indicator
-		}
+		pathToIndicator[path] = indicator
 	}
 	return pathToIndicator, nil
 }

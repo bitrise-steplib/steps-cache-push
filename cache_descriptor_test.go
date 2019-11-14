@@ -32,7 +32,7 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 
 	t.Log("mod time method")
 	{
-		descriptor, err := cacheDescriptor(map[string][]string{filepath.Join(tmpDir, "subdir", "file1"): {filepath.Join(tmpDir, "subdir", "file1")}}, MODTIME)
+		descriptor, err := cacheDescriptor(map[string]string{filepath.Join(tmpDir, "subdir", "file1"): filepath.Join(tmpDir, "subdir", "file1")}, MODTIME)
 		if err != nil {
 			t.Errorf("cacheDescriptor() error = %v, wantErr %v", err, false)
 			return
@@ -43,7 +43,7 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 			return
 		}
 
-		for modTimeStr := range descriptor {
+		for _, modTimeStr := range descriptor {
 			modTime, err := strconv.Atoi(modTimeStr)
 			if err != nil {
 				t.Errorf("failed to int parse: %s, error: %s", modTimeStr, err)
@@ -53,7 +53,6 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 			if start.Before(mod) || end.After(mod) {
 				t.Errorf("invalid modtime (%v) should be > %v && < %v", mod, start, end)
 				return
-
 			}
 		}
 	}
@@ -74,30 +73,30 @@ func Test_cacheDescriptor(t *testing.T) {
 	createDirStruct(t, pths)
 
 	tests := []struct {
-		name         string
-		indicatorMap map[string][]string
-		method       ChangeIndicator
-		descriptor   map[string][]string
-		wantErr      bool
+		name                string
+		indicatorByCachePth map[string]string
+		method              ChangeIndicator
+		descriptor          map[string]string
+		wantErr             bool
 	}{
 		{
-			name:         "no change indicator",
-			indicatorMap: map[string][]string{"": {filepath.Join(tmpDir, "subdir", "file1")}},
-			method:       MD5,
-			descriptor:   map[string][]string{"-": {filepath.Join(tmpDir, "subdir", "file1")}},
-			wantErr:      false,
+			name:                "no change indicator",
+			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "file1"): ""},
+			method:              MD5,
+			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "-"},
+			wantErr:             false,
 		},
 		{
-			name:         "content hash method",
-			indicatorMap: map[string][]string{filepath.Join(tmpDir, "subdir", "file2"): {filepath.Join(tmpDir, "subdir", "file1")}},
-			method:       MD5,
-			descriptor:   map[string][]string{"d41d8cd98f00b204e9800998ecf8427e": {filepath.Join(tmpDir, "subdir", "file1")}}, // empty string MD5 hash
-			wantErr:      false,
+			name:                "content hash method",
+			indicatorByCachePth: map[string]string{filepath.Join(tmpDir, "subdir", "file1"): filepath.Join(tmpDir, "subdir", "file2")},
+			method:              MD5,
+			descriptor:          map[string]string{filepath.Join(tmpDir, "subdir", "file1"): "d41d8cd98f00b204e9800998ecf8427e"}, // empty string MD5 hash
+			wantErr:             false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			descriptor, err := cacheDescriptor(tt.indicatorMap, tt.method)
+			descriptor, err := cacheDescriptor(tt.indicatorByCachePth, tt.method)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("cacheDescriptor() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -112,67 +111,69 @@ func Test_cacheDescriptor(t *testing.T) {
 func Test_compare(t *testing.T) {
 	tests := []struct {
 		name string
-		old  map[string][]string
-		new  map[string][]string
+		old  map[string]string
+		new  map[string]string
 		want result
 	}{
 		{
 			name: "empty test",
-			old:  map[string][]string{},
-			new:  map[string][]string{},
+			old:  map[string]string{},
+			new:  map[string]string{},
 			want: result{},
 		},
 		{
 			name: "removed",
-			old:  map[string][]string{"indicator": {"pth"}},
-			new:  map[string][]string{},
+			old:  map[string]string{"pth": "indicator"},
+			new:  map[string]string{},
 			want: result{removed: []string{"pth"}},
 		},
 		{
 			name: "ignored removed",
-			old:  map[string][]string{"-": {"pth"}},
-			new:  map[string][]string{},
+			old:  map[string]string{"pth": "-"},
+			new:  map[string]string{},
 			want: result{removedIgnored: []string{"pth"}},
 		},
 		{
 			name: "changed",
-			old:  map[string][]string{"indicator1": {"pth"}},
-			new:  map[string][]string{"indicator2": {"pth"}},
+			old:  map[string]string{"pth": "indicator1"},
+			new:  map[string]string{"pth": "indicator2"},
 			want: result{changed: []string{"pth"}},
 		},
 		{
 			name: "matching",
-			old:  map[string][]string{"indicator": {"pth"}},
-			new:  map[string][]string{"indicator": {"pth"}},
+			old:  map[string]string{"pth": "indicator"},
+			new:  map[string]string{"pth": "indicator"},
 			want: result{matching: []string{"pth"}},
 		},
 		{
 			name: "added",
-			old:  map[string][]string{},
-			new:  map[string][]string{"indicator": {"pth"}},
+			old:  map[string]string{},
+			new:  map[string]string{"pth": "indicator"},
 			want: result{added: []string{"pth"}},
 		},
 		{
 			name: "ignored added",
-			old:  map[string][]string{},
-			new:  map[string][]string{"-": {"pth"}},
+			old:  map[string]string{},
+			new:  map[string]string{"pth": "-"},
 			want: result{addedIgnored: []string{"pth"}},
 		},
 		{
 			name: "complex",
-			old: map[string][]string{
-				"indicator":  {"removedPth", "matching"},
-				"-":          {"ignoredRemovedPth"},
-				"indicator1": {"changed"},
+			old: map[string]string{
+				"removedPth":        "indicator",
+				"ignoredRemovedPth": "-",
+				"changed":           "indicator1",
+				"matching":          "indicator",
 				// "added":             "indicator",
 				// "ignoredAdded":      "-",
 			},
-			new: map[string][]string{
+			new: map[string]string{
 				// "removedPth":        "indicator",
 				// "ignoredRemovedPth": "-",
-				"indicator2": {"changed"},
-				"indicator":  {"matching", "added"},
-				"-":          {"ignoredAdded"},
+				"changed":      "indicator2",
+				"matching":     "indicator",
+				"added":        "indicator",
+				"ignoredAdded": "-",
 			},
 			want: result{
 				removed:        []string{"removedPth"},
@@ -347,32 +348,6 @@ func Test_convertDescriptorToIndicatorMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := convertDescriptorToIndicatorMap(tt.indicatorByPth); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("convertDescriptorToIndicatorMap() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_convertDescriptorToIndicatorByPath(t *testing.T) {
-	tests := []struct {
-		name         string
-		indicatorMap map[string][]string
-		want         map[string]string
-	}{
-		{
-			name:         "single_single_conversion",
-			indicatorMap: map[string][]string{"indicator1": {"path1"}, "indicator2": {"path2"}},
-			want:         map[string]string{"path1": "indicator1", "path2": "indicator2"},
-		},
-		{
-			name:         "multiple_single_conversion",
-			indicatorMap: map[string][]string{"indicator1": {"path1", "path2"}},
-			want:         map[string]string{"path1": "indicator1", "path2": "indicator1"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := convertDescriptorToIndicatorByPath(tt.indicatorMap); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertDescriptorToIndicatorByPath() = %v, want %v", got, tt.want)
 			}
 		})
 	}
