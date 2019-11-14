@@ -77,6 +77,7 @@ func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (
 		var indicator string
 		var err error
 		if len(indicatorPth) == 0 {
+			// this file's changes does not fluctuates existing cache invalidation
 			indicator = "-"
 		} else if method == MD5 {
 			indicator, err = fileContentHash(indicatorPth)
@@ -86,9 +87,8 @@ func cacheDescriptor(indicatorMap map[string][]string, method ChangeIndicator) (
 		if err != nil {
 			return nil, err
 		}
-		for _, pth := range pths {
-			descriptor[indicator] = append(descriptor[indicator], pth)
-		}
+
+		descriptor[indicator] = pths
 	}
 	return descriptor, nil
 }
@@ -106,6 +106,7 @@ func fileContentHash(pth string) (string, error) {
 		}
 	}()
 
+	// #nosec G401 Ignore gosec warning: Use of weak cryptographic primitive
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

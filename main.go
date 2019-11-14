@@ -147,13 +147,6 @@ func main() {
 		logErrorfAndExit("Failed to create archive: %s", err)
 	}
 
-	var pths []string
-	for _, pp := range indicatorMap {
-		for _, pth := range pp {
-			pths = append(pths, pth)
-		}
-	}
-
 	stackData, err := stackVersionData(configs.StackID)
 	if err != nil {
 		logErrorfAndExit("Failed to get stack version info: %s", err)
@@ -163,7 +156,7 @@ func main() {
 		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
 	}
 
-	if err := archive.Write(pths); err != nil {
+	if err := archive.Write(indicatorByPth); err != nil {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
 
