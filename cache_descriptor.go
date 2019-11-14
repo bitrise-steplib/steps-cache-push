@@ -75,7 +75,6 @@ func compare(old map[string]string, new map[string]string) result {
 
 // cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
 func cacheDescriptor(pathToIndicatorFile map[string]string, method ChangeIndicator) (map[string]string, error) {
-	//indicatorPathToIndicator := map[string]string{}
 	pathToIndicator := map[string]string{}
 
 	indicatorToPaths := map[string][]string{}
