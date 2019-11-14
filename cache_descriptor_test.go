@@ -326,29 +326,3 @@ func Test_readCacheDescriptor(t *testing.T) {
 		})
 	}
 }
-
-func Test_convertDescriptorToIndicatorMap(t *testing.T) {
-	tests := []struct {
-		name           string
-		indicatorByPth map[string]string
-		want           map[string][]string
-	}{
-		{
-			name:           "single_single_conversion",
-			indicatorByPth: map[string]string{"path1": "indicator1", "path2": "indicator2"},
-			want:           map[string][]string{"indicator1": {"path1"}, "indicator2": {"path2"}},
-		},
-		{
-			name:           "single_multiple_conversion",
-			indicatorByPth: map[string]string{"path1": "indicator1", "path2": "indicator1"},
-			want:           map[string][]string{"indicator1": {"path1", "path2"}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := convertDescriptorToIndicatorMap(tt.indicatorByPth); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertDescriptorToIndicatorMap() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

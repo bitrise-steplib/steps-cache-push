@@ -153,13 +153,3 @@ func readCacheDescriptor(pth string) (map[string]string, error) {
 
 	return previousFilePathMap, nil
 }
-
-// convertDescriptorToIndicatorMap converts the descriptor to an indicator map (from path - indicator to
-// indicator - paths slice.
-func convertDescriptorToIndicatorMap(indicatorByPth map[string]string) map[string][]string {
-	var indicatorMap = map[string][]string{}
-	for pth, indicator := range indicatorByPth {
-		indicatorMap[indicator] = append(indicatorMap[indicator], pth)
-	}
-	return indicatorMap
-}
