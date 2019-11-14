@@ -201,7 +201,7 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 // Otherwise a path will affect the previous cache invalidation:
 // if the path has indicator, the indicator will affect the previous cache invalidation
 // otherwise the file itself.
-func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) (map[string]string, error) {
+func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) map[string]string {
 	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
@@ -222,5 +222,5 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 		indicatorByCachePth[pth] = indicator
 	}
 
-	return indicatorByCachePth, nil
+	return indicatorByCachePth
 }

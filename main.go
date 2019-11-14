@@ -64,10 +64,7 @@ func main() {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
-	pathToIndicatorPath, err = interleave(pathToIndicatorPath, excludeByPattern)
-	if err != nil {
-		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
-	}
+	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
