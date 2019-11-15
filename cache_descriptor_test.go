@@ -57,6 +57,7 @@ func Test_Test_cacheDescriptorModTime(t *testing.T) {
 		}
 	}
 }
+
 func Test_cacheDescriptor(t *testing.T) {
 	tmpDir, err := pathutil.NormalizedOSTempDirPath("cache")
 	if err != nil {
@@ -270,7 +271,7 @@ func Test_result_hasChanges(t *testing.T) {
 
 func Test_readCacheDescriptor(t *testing.T) {
 	desired := map[string]string{
-		"pacth/to/cache": "indicator",
+		"path/to/cache": "indicator",
 	}
 
 	content, err := json.Marshal(desired)

@@ -53,8 +53,8 @@ func NewArchive(pth string, compress bool) (*Archive, error) {
 }
 
 // Write writes the given files in the cache archive.
-func (a *Archive) Write(pths []string) error {
-	for _, pth := range pths {
+func (a *Archive) Write(pathToIndicator map[string]string) error {
+	for pth := range pathToIndicator {
 		if err := a.writeOne(pth); err != nil {
 			return err
 		}

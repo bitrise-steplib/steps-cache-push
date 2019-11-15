@@ -76,7 +76,7 @@ func TestArchive_Write(t *testing.T) {
 			t.Fatalf("failed to create archive: %s", err)
 		}
 
-		if err := archive.Write([]string{fileToArchive}); err != nil {
+		if err := archive.Write(map[string]string{fileToArchive: "indicator"}); err != nil {
 			t.Fatalf("failed to write archive: %s", err)
 		}
 	}
@@ -88,7 +88,7 @@ func TestArchive_Write(t *testing.T) {
 			t.Fatalf("failed to create archive: %s", err)
 		}
 
-		if err := archive.Write([]string{fileToArchive}); err != nil {
+		if err := archive.Write(map[string]string{fileToArchive: "indicator"}); err != nil {
 			t.Fatalf("failed to write archive: %s", err)
 		}
 	}
@@ -131,7 +131,7 @@ func TestArchive_Close(t *testing.T) {
 			t.Fatalf("failed to create archive: %s", err)
 		}
 
-		if err := archive.Write([]string{fileToArchive}); err != nil {
+		if err := archive.Write(map[string]string{fileToArchive: ""}); err != nil {
 			t.Fatalf("failed to write archive: %s", err)
 		}
 
@@ -147,7 +147,7 @@ func TestArchive_Close(t *testing.T) {
 			t.Fatalf("failed to create archive: %s", err)
 		}
 
-		if err := archive.Write([]string{fileToArchive}); err != nil {
+		if err := archive.Write(map[string]string{fileToArchive: ""}); err != nil {
 			t.Fatalf("failed to write archive: %s", err)
 		}
 

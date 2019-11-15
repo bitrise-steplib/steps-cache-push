@@ -47,13 +47,13 @@ func main() {
 
 	log.Infof("Cleaning paths")
 
-	indicatorByPth := parseIncludeList(strings.Split(configs.Paths, "\n"))
-	if len(indicatorByPth) == 0 {
+	pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
+	if len(pathToIndicatorPath) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
 
-	indicatorByPth, err = normalizeIndicatorByPath(indicatorByPth)
+	pathToIndicatorPath, err = normalizeIndicatorByPath(pathToIndicatorPath)
 	if err != nil {
 		logErrorfAndExit("Failed to parse include list: %s", err)
 	}
@@ -64,14 +64,11 @@ func main() {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
-	indicatorByPth, err = interleave(indicatorByPth, excludeByPattern)
-	if err != nil {
-		logErrorfAndExit("Failed to interleave include and ignore list: %s", err)
-	}
+	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
-	if len(indicatorByPth) == 0 {
+	if len(pathToIndicatorPath) == 0 {
 		log.Warnf("No path to cache, skip caching...")
 		os.Exit(0)
 	}
@@ -92,7 +89,7 @@ func main() {
 		log.Printf("No previous cache info found")
 	}
 
-	curDescriptor, err := cacheDescriptor(indicatorByPth, ChangeIndicator(configs.FingerprintMethodID))
+	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
 	if err != nil {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
 	}
@@ -146,11 +143,6 @@ func main() {
 		logErrorfAndExit("Failed to create archive: %s", err)
 	}
 
-	var pths []string
-	for pth := range indicatorByPth {
-		pths = append(pths, pth)
-	}
-
 	stackData, err := stackVersionData(configs.StackID)
 	if err != nil {
 		logErrorfAndExit("Failed to get stack version info: %s", err)
@@ -160,7 +152,7 @@ func main() {
 		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
 	}
 
-	if err := archive.Write(pths); err != nil {
+	if err := archive.Write(pathToIndicatorPath); err != nil {
 		logErrorfAndExit("Failed to populate archive: %s", err)
 	}
 

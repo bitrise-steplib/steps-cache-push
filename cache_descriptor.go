@@ -39,23 +39,24 @@ func (r result) hasChanges() bool {
 }
 
 // compare compares two cache descriptor file and return the differences.
-func compare(old map[string]string, new map[string]string) (r result) {
+func compare(old map[string]string, new map[string]string) result {
 	newCopy := make(map[string]string, len(new))
 	for k, v := range new {
 		newCopy[k] = v
 	}
 
+	var result result
 	for oldPth, oldIndicator := range old {
 		newIndicator, ok := newCopy[oldPth]
 		switch {
 		case !ok && oldIndicator == "-":
-			r.removedIgnored = append(r.removedIgnored, oldPth)
+			result.removedIgnored = append(result.removedIgnored, oldPth)
 		case !ok:
-			r.removed = append(r.removed, oldPth)
+			result.removed = append(result.removed, oldPth)
 		case oldIndicator != newIndicator:
-			r.changed = append(r.changed, oldPth)
+			result.changed = append(result.changed, oldPth)
 		default:
-			r.matching = append(r.matching, oldPth)
+			result.matching = append(result.matching, oldPth)
 		}
 
 		delete(newCopy, oldPth)
@@ -63,38 +64,44 @@ func compare(old map[string]string, new map[string]string) (r result) {
 
 	for newPth, newIndicator := range newCopy {
 		if newIndicator == "-" {
-			r.addedIgnored = append(r.addedIgnored, newPth)
+			result.addedIgnored = append(result.addedIgnored, newPth)
 		} else {
-			r.added = append(r.added, newPth)
+			result.added = append(result.added, newPth)
 		}
 	}
 
-	return
+	return result
 }
 
-// cacheDescriptor creates a cache descriptor for a given cache_path - change_indicator_path mapping.
-func cacheDescriptor(indicatorByCachePth map[string]string, method ChangeIndicator) (map[string]string, error) {
-	descriptor := map[string]string{}
-	for pth, indicatorPth := range indicatorByCachePth {
-		if len(indicatorPth) == 0 {
-			// this file's changes does not fluctuates existing cache invalidation
-			descriptor[pth] = "-"
-			continue
-		}
+// cacheDescriptor creates a cache descriptor for a given change_indicator_path - cache_path (single-multiple) mapping.
+func cacheDescriptor(pathToIndicatorFile map[string]string, method ChangeIndicator) (map[string]string, error) {
+	pathToIndicator := map[string]string{}
 
-		var err error
+	indicatorToPaths := map[string][]string{}
+	for path, indicatorPath := range pathToIndicatorFile {
+		indicatorToPaths[indicatorPath] = append(indicatorToPaths[indicatorPath], path)
+	}
+
+	for indicatorPath, paths := range indicatorToPaths {
 		var indicator string
-		if method == MD5 {
-			indicator, err = fileContentHash(indicatorPth)
+		var err error
+		if len(indicatorPath) == 0 {
+			// this file's changes does not invalidate existing cache
+			indicator = "-"
+		} else if method == MD5 {
+			indicator, err = fileContentHash(indicatorPath)
 		} else {
-			indicator, err = fileModtime(indicatorPth)
+			indicator, err = fileModtime(indicatorPath)
 		}
 		if err != nil {
 			return nil, err
 		}
-		descriptor[pth] = indicator
+
+		for _, path := range paths {
+			pathToIndicator[path] = indicator
+		}
 	}
-	return descriptor, nil
+	return pathToIndicator, nil
 }
 
 // fileContentHash returns file's md5 content hash.
@@ -110,6 +117,7 @@ func fileContentHash(pth string) (string, error) {
 		}
 	}()
 
+	// #nosec G401 Ignore gosec warning: Use of weak cryptographic primitive
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

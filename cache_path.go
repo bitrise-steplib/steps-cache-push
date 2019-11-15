@@ -19,7 +19,7 @@ import (
 
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
-	glob "github.com/ryanuber/go-glob"
+	"github.com/ryanuber/go-glob"
 )
 
 // parseIncludeListItem separates path to cache and change indicator path.
@@ -201,7 +201,7 @@ func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
 // Otherwise a path will affect the previous cache invalidation:
 // if the path has indicator, the indicator will affect the previous cache invalidation
 // otherwise the file itself.
-func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) (map[string]string, error) {
+func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bool) map[string]string {
 	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
@@ -212,15 +212,15 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 		}
 
 		if skip || indicator == "-" {
-			// this file's changes does not fluctuates existing cache invalidation
+			// this file's changes does not invalidate existing cache
 			indicator = ""
 		} else if len(indicator) == 0 {
-			// the file's own content fluctuates existing cache invalidation
+			// the file's content is used to invalidate existing cache
 			indicator = pth
-		} // else: the file's indicator content fluctuates existing cache invalidation
+		} // else: the file's indicator content is used to invalidate existing cache
 
 		indicatorByCachePth[pth] = indicator
 	}
 
-	return indicatorByCachePth, nil
+	return indicatorByCachePth
 }

@@ -564,37 +564,41 @@ func Test_interleave(t *testing.T) {
 			indicatorByPth:      map[string]string{"path/to/cache": ""},
 			excludeByPattern:    map[string]bool{},
 			indicatorByCachePth: map[string]string{"path/to/cache": "path/to/cache"},
-			wantErr:             false,
+		},
+		{
+			name: "no indicator, own content is the indicator more files",
+			indicatorByPth: map[string]string{
+				"path/to/cache":  "",
+				"path/to/cache2": "",
+			},
+			excludeByPattern: map[string]bool{},
+			indicatorByCachePth: map[string]string{
+				"path/to/cache":  "path/to/cache",
+				"path/to/cache2": "path/to/cache2",
+			},
 		},
 		{
 			name:                "no ignore match",
 			indicatorByPth:      map[string]string{"path/to/cache": "indicator/path"},
 			excludeByPattern:    map[string]bool{"path/to/include": false},
 			indicatorByCachePth: map[string]string{"path/to/cache": "indicator/path"},
-			wantErr:             false,
 		},
 		{
 			name:                "ignore match, do not track changes",
 			indicatorByPth:      map[string]string{"path/to/cache": "indicator/path"},
 			excludeByPattern:    map[string]bool{"path/to": false},
 			indicatorByCachePth: map[string]string{"path/to/cache": ""},
-			wantErr:             false,
 		},
 		{
 			name:                "exclude match, remove",
 			indicatorByPth:      map[string]string{"path/to/cache": "indicator/path"},
 			excludeByPattern:    map[string]bool{"path/to": true},
 			indicatorByCachePth: map[string]string{},
-			wantErr:             false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := interleave(tt.indicatorByPth, tt.excludeByPattern)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("interleave() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := interleave(tt.indicatorByPth, tt.excludeByPattern)
 			if !reflect.DeepEqual(got, tt.indicatorByCachePth) {
 				t.Errorf("interleave() = %v, want %v", got, tt.indicatorByCachePth)
 			}
