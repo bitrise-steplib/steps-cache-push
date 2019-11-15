@@ -86,7 +86,7 @@ func cacheDescriptor(pathToIndicatorFile map[string]string, method ChangeIndicat
 		var indicator string
 		var err error
 		if len(indicatorPath) == 0 {
-			// this file's changes does not fluctuates existing cache invalidation
+			// this file's changes does not invalidate existing cache
 			indicator = "-"
 		} else if method == MD5 {
 			indicator, err = fileContentHash(indicatorPath)
