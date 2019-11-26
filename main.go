@@ -110,7 +110,6 @@ func main() {
 
 		result := compare(prevDescriptor, curDescriptor)
 
-		log.Warnf("Previous cache is invalid, new cache will be generated:")
 		log.Warnf("%d files needs to be removed", len(result.removed))
 		logDebugPaths(result.removed)
 		log.Warnf("%d files has changed", len(result.changed))
