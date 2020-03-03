@@ -1,14 +1,44 @@
 title: "Bitrise.io Cache:Push"
 summary: "Updates the Cache, if required"
 description: |-
-  This step checks whether the cache has to be updated (based on the
-  `Cache Paths` and `Ignore Paths from change check` inputs).
-  If it has to be updated, the step will create a new cache archive and upload it.
+  Checks whether cache has to be updated based on the **Cache Paths** and **Ignore Paths** inputs.
+  If it does, the Step creates a new cache archive and uploads it. 
+  It won't update/upload the cache if the cache hasn't changed nor in the case of a pull request unless you change the Step's `run_if` property. 
+  For caching, you will need the **Bitrise.io Cache:Pull** Step at the beginning of your Workflow (after the **Git Clone Repository** Step but before a dependency installer Step) to download the previous cache, if any. 
+  The **Bitrise.io Cache:Push** Step should be the very last Step in your Workflow.
+  
+  ### Configuring the Step
+  1. Cache any directory or file by adding it in the **Cache paths** field. 
+  If adding multiple paths, separate them with a newline.
+  If you have a path in the list which does not exist, it will not cause the Step to fail. 
+  You can also specify an update indicator file with the `->` syntax, for example, `update/this -> if/this/file/is/updated.` 
+  Please note the indicator points to a file and not to a folder.
+  2. In the **Ignore Paths from change check** field, you can set any path which you don't want to do change analysis for.
+  - Paths prefixed with an `!` will get ignored from the cache archive.
+  - The path can also include `*`, `**`, `/`. 
+  The `*` will replace a path element, the `**` will replace part of a path. 
+  To exclude a full directory, simply put a `/` behind the directory.
+  Note that you can't ignore a path which results in an invalid cache item.
+  3. Modify **Working directory** if you wish to set relative cache paths and reference them from a working directory other than `$BITRISE_SOURCE_DIR`.
+  4. Select a **Fingerprint Method** option (`file-content-hash` or `file-mod-time`) to detect changes in a directory, file, or update an indicator file. 
+  If changes are detected, new cache gets generated.
+  5. If you set **Debug mode?** input to `true`, the Step will print out more detailed logs.
+  6. With **Compress cache?** input set to `true`, you can compress the cache archive for faster uploads and downloads, especially useful for node-modules and other huge dependency folders.
+  7. In `Ignore paths collected by steps` you can set which files or extensions should be ignored by the Step during the build.
+  8. `Cache Upload URL` shows the URL where the cache gets uploaded.
+  
+  ### Troubleshooting
+  We recommend you do not cache any `package.lock`, `gemfile.lock`, `podfile.lock` but follow the dependency best practices instead.
 
-  It won't update/upload the cache if the cache did not change,
-  nor in the case of Pull Request builds (unless you change the `run_if` property of the Step).
+  ### Useful links
+  - [About caching](https://devcenter.bitrise.io/builds/caching/about-caching-index/)
+  - [Caching Cocoapods](https://devcenter.bitrise.io/builds/caching/caching-cocoapods/)
+  - [Caching Gradle](https://devcenter.bitrise.io/builds/caching/caching-gradle/)
 
-  For more information on setup and tips & tricks, check out our [Bitrise DevCenter guide](http://devcenter.bitrise.io/caching/about-caching/).
+  ### Related Steps
+  - [Bitrise.io Cache:Pull](https://www.bitrise.io/integrations/steps/cache-pull)
+  - [Git Clone Repository](https://www.bitrise.io/integrations/steps/git-clone)
+  
 website: https://github.com/bitrise-steplib/steps-cache-push
 source_code_url: https://github.com/bitrise-steplib/steps-cache-push.git
 support_url: https://github.com/bitrise-steplib/steps-cache-push/issues
