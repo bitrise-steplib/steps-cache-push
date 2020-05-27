@@ -8,7 +8,9 @@ description: |-
   The **Bitrise.io Cache:Push** Step should be the very last Step in your Workflow.
   
   ### Configuring the Step
-  1. Cache any directory or file by adding it in the **Cache paths** field. 
+
+  1. Cache any directory or file by adding it in the **Cache paths** field.
+  For most cases, caching will automatically work based on your native build and testing Steps as these automatically configure cache paths in your cache Steps.
   If adding multiple paths, separate them with a newline.
   If you have a path in the list which does not exist, it will not cause the Step to fail. 
   You can also specify an update indicator file with the `->` syntax, for example, `update/this -> if/this/file/is/updated.` 
@@ -20,7 +22,7 @@ description: |-
   To exclude a full directory, simply put a `/` behind the directory.
   Note that you can't ignore a path which results in an invalid cache item.
   3. Modify **Working directory** if you wish to set relative cache paths and reference them from a working directory other than `$BITRISE_SOURCE_DIR`.
-  4. Select a **Fingerprint Method** option (`file-content-hash` or `file-mod-time`) to detect changes in a directory, file, or update an indicator file. 
+  4. Select a **Fingerprint Method** option (`file-content-hash` or `file-mod-time`) to detect changes in a directory, file, or in an update indicator file. 
   If changes are detected, new cache gets generated.
   5. If you set **Debug mode?** input to `true`, the Step will print out more detailed logs.
   6. With **Compress cache?** input set to `true`, you can compress the cache archive for faster uploads and downloads, especially useful for node-modules and other huge dependency folders.
@@ -28,7 +30,7 @@ description: |-
   8. `Cache Upload URL` shows the URL where the cache gets uploaded.
   
   ### Troubleshooting
-  We recommend you do not cache any `package.lock`, `gemfile.lock`, `podfile.lock` but follow the dependency best practices instead.
+  We recommend you do not cache any dependency manager lock file (for example, `package.lock`, `gemfile.lock`, `podfile.lock`) as it would override the lock file in your repository.
 
   ### Useful links
   - [About caching](https://devcenter.bitrise.io/builds/caching/about-caching-index/)
