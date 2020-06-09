@@ -230,7 +230,8 @@ workflows:
             # export the MD5 hash of test_ignorechanges.txt file
             # this file's content should remain as it is (in the archive) even if it gets modified
             # since this files is in ignore list and no other files changed
-            envman add --key MD5PREVIOUSLY --value $(md5 -q $TMP_DIR/test_ignorechanges.txt)
+            filehash=`md5sum -q $TMP_DIR/test_ignorechanges.txt || md5 -q $TMP_DIR/test_ignorechanges.txt`
+            envman add --key MD5PREVIOUSLY --value ${filehash}
 
             # following cache should not update the archive even if this file changes
             echo "content" >> $TMP_DIR/test_ignorechanges.txt
