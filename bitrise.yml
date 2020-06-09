@@ -232,7 +232,7 @@ workflows:
             # since this files is in ignore list and no other files changed
             mymd5=`which md5sum` || mymd5=`which md5`
             FILEMD5=`$mymd5 < $TMP_DIR/test_ignorechanges.txt`
-            envman add --key MD5PREVIOUSLY --value ${FILEMD5}
+            envman add --key MD5PREVIOUSLY --value "${FILEMD5}"
 
             # following cache should not update the archive even if this file changes
             echo "content" >> $TMP_DIR/test_ignorechanges.txt
