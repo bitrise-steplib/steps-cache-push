@@ -230,11 +230,12 @@ workflows:
             # export the MD5 hash of test_ignorechanges.txt file
             # this file's content should remain as it is (in the archive) even if it gets modified
             # since this files is in ignore list and no other files changed
-            filehash=`md5sum $TMP_DIR/test_ignorechanges.txt || md5 -q $TMP_DIR/test_ignorechanges.txt`
-            envman add --key MD5PREVIOUSLY --value ${filehash}
+            FILE=$TMP_DIR/test_ignorechanges.txt
+            FILEMD5=$(md5sum $FILE || md5 -q $FILE)
+            envman add --key MD5PREVIOUSLY --value ${FILEMD5}
 
             # following cache should not update the archive even if this file changes
-            echo "content" >> $TMP_DIR/test_ignorechanges.txt
+            echo "content" >> $FILE
 
             # .mp3 is part of the exclude list, should not exists
             if [ -f $TMP_DIR/test_exclude_ext.mp3 ]; then
@@ -265,7 +266,8 @@ workflows:
             tar -xPf /tmp/cache-archive.tar
 
             # test_ignorechanges.txt was part of the ignore list, so it's change should not present in the archive
-            export MD5CURRENT=$(md5 -q $TMP_DIR/test_ignorechanges.txt)
+            FILE=$TMP_DIR/test_ignorechanges.txt
+            MD5CURRENT=$(md5sum $FILE || md5 -q $FILE)
             if [ "$MD5CURRENT" != "$MD5PREVIOUSLY" ]; then
               echo "MD5 changed."
               exit 1
