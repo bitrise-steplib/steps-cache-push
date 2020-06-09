@@ -9,7 +9,11 @@
 
 [[constraint]]
   name = "github.com/ryanuber/go-glob"
-  version = "1.0.0"
+  version = "^1.0.0"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "^1.6.1"
 
 [prune]
   go-tests = true

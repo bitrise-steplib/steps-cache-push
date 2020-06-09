@@ -12,6 +12,7 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/stretchr/testify/require"
 )
 
 func createDirStruct(t *testing.T, contentByPth map[string]string) {
@@ -272,68 +273,75 @@ func Test_expandPath(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		pth            string
-		regularFiles   []string
-		irregularPaths []string
-		wantErr        bool
+		name         string
+		pth          string
+		regularFiles []string
+		symlinkPaths []string
+		dirPaths     []string
+		wantErr      bool
 	}{
 		{
-			name:           "list files in a directory",
-			pth:            filepath.Join(tmpDir, "subdir"),
-			regularFiles:   []string{filepath.Join(tmpDir, "subdir", "file1"), filepath.Join(tmpDir, "subdir", "file2")},
-			irregularPaths: nil,
-			wantErr:        false,
+			name:         "list files in a directory",
+			pth:          filepath.Join(tmpDir, "subdir"),
+			regularFiles: []string{filepath.Join(tmpDir, "subdir", "file1"), filepath.Join(tmpDir, "subdir", "file2")},
+			symlinkPaths: nil,
+			dirPaths:     []string{filepath.Join(tmpDir, "subdir")},
+			wantErr:      false,
 		},
 		{
-			name:           "puts file path in an array",
-			pth:            filepath.Join(tmpDir, "subdir", "file1"),
-			regularFiles:   []string{filepath.Join(tmpDir, "subdir", "file1")},
-			irregularPaths: nil,
-			wantErr:        false,
+			name:         "puts file path in an array",
+			pth:          filepath.Join(tmpDir, "subdir", "file1"),
+			regularFiles: []string{filepath.Join(tmpDir, "subdir", "file1")},
+			symlinkPaths: nil,
+			dirPaths:     nil,
+			wantErr:      false,
 		},
 		{
-			name:           "single symlink file",
-			pth:            linkFilePath,
-			regularFiles:   nil,
-			irregularPaths: []string{linkFilePath},
-			wantErr:        false,
+			name:         "single symlink file",
+			pth:          linkFilePath,
+			regularFiles: nil,
+			symlinkPaths: []string{linkFilePath},
+			dirPaths:     nil,
+			wantErr:      false,
 		},
 		{
-			name:           "single symlink directory",
-			pth:            linkDirPath,
-			regularFiles:   nil,
-			irregularPaths: []string{linkDirPath},
-			wantErr:        false,
+			name:         "single symlink directory",
+			pth:          linkDirPath,
+			regularFiles: nil,
+			symlinkPaths: []string{linkDirPath},
+			dirPaths:     nil,
+			wantErr:      false,
 		},
 		{
-			name:           "directory with symlink to file in cache dir",
-			pth:            filepath.Join(tmpDir, "link"),
-			regularFiles:   []string{filepath.Join(tmpDir, "link", "file")},
-			irregularPaths: []string{linkFilePath},
-			wantErr:        false,
+			name:         "directory with symlink to file in cache dir",
+			pth:          filepath.Join(tmpDir, "link"),
+			regularFiles: []string{filepath.Join(tmpDir, "link", "file")},
+			symlinkPaths: []string{linkFilePath},
+			dirPaths:     []string{filepath.Join(tmpDir, "link")},
+			wantErr:      false,
 		},
 		{
-			name:           "directory with symlink to dir outside of cache dir",
-			pth:            filepath.Join(tmpDir, "link_dir"),
-			regularFiles:   []string{filepath.Join(tmpDir, "link_dir", "subdir", "file")},
-			irregularPaths: []string{linkDirPath},
-			wantErr:        false,
+			name:         "directory with symlink to dir outside of cache dir",
+			pth:          filepath.Join(tmpDir, "link_dir"),
+			regularFiles: []string{filepath.Join(tmpDir, "link_dir", "subdir", "file")},
+			symlinkPaths: []string{linkDirPath},
+			dirPaths: []string{
+				filepath.Join(tmpDir, "link_dir"),
+				filepath.Join(tmpDir, "link_dir", "subdir"),
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got1, got2, err := expandPath(tt.pth)
+			got1, got2, got3, err := expandPath(tt.pth)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("expandPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got1, tt.regularFiles) {
-				t.Errorf("expandPath() = %v want %v", got1, tt.regularFiles)
-			}
-			if !reflect.DeepEqual(got2, tt.irregularPaths) {
-				t.Errorf("expandPath() = %v, want %v", got2, tt.irregularPaths)
-			}
+			require.Equal(t, tt.regularFiles, got1, "expandPath() file paths")
+			require.Equal(t, tt.symlinkPaths, got2, "expandPath() synlink paths")
+			require.Equal(t, tt.dirPaths, got3, "expandPath() directory paths")
 		})
 	}
 }
@@ -418,6 +426,7 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 			name:            "expands path if it is a dir",
 			indicatorByPath: map[string]string{filepath.Join(tmpDir, "subdir"): ""},
 			normalized: map[string]string{
+				filepath.Join(tmpDir, "subdir"):          "-",
 				filepath.Join(tmpDir, "subdir", "file1"): "",
 				filepath.Join(tmpDir, "subdir", "file2"): "",
 			},
@@ -427,6 +436,7 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 			name:            "set symlink indicator to ignore file for cache invalidation",
 			indicatorByPath: map[string]string{filepath.Join(tmpDir, "dir_with_symlink"): ""},
 			normalized: map[string]string{
+				filepath.Join(tmpDir, "dir_with_symlink"):         "-",
 				filepath.Join(tmpDir, "dir_with_symlink", "file"): "",
 				linkFilePath:          "-",
 				linkDirPath:           "-",
@@ -441,9 +451,7 @@ func Test_normalizeIndicatorByPath(t *testing.T) {
 				t.Errorf("normalizeIndicatorByPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.normalized) {
-				t.Errorf("normalizeIndicatorByPath() = %v, want %v", got, tt.normalized)
-			}
+			require.Equal(t, tt.normalized, got, "normalizeIndicatorByPath() return value")
 		})
 	}
 }
