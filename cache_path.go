@@ -78,8 +78,8 @@ func isSymlink(pth string) (bool, error) {
 
 // expandPath returns cacheable files inside a directory recursively.
 // If parameter root is a file, it returns that file.
-// An array of regural files and one of symlink is retruned, other irregural files (directory, named pipe, socket) are ignored.
-func expandPath(root string) (regularFiles []string, symlinkPaths []string, err error) {
+// An array of regural files, directories and symlinks is returned, other irregural files (named pipe, socket) are ignored.
+func expandPath(root string) (regularFiles []string, symlinkPaths []string, dirPaths []string, err error) {
 	if err := filepath.Walk(root, func(path string, i os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -94,8 +94,14 @@ func expandPath(root string) (regularFiles []string, symlinkPaths []string, err 
 			return nil
 		}
 
+		// Adding directories, in case a directory is empty, it will still be included
+		if i.Mode().IsDir() {
+			dirPaths = append(dirPaths, path)
+			return nil
+		}
+
 		// Not adding directories and non symlink irregural files to the cache
-		// ModeDir | ModeNamedPipe | ModeSocket | ModeDevice | ModeCharDevice | ModeIrregular & i.Mode() != 0
+		// ModeNamedPipe | ModeSocket | ModeDevice | ModeCharDevice | ModeIrregular & i.Mode() != 0
 		if !i.Mode().IsRegular() {
 			return nil
 		}
@@ -103,10 +109,10 @@ func expandPath(root string) (regularFiles []string, symlinkPaths []string, err 
 		regularFiles = append(regularFiles, path)
 		return nil
 	}); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return regularFiles, symlinkPaths, nil
+	return regularFiles, symlinkPaths, dirPaths, nil
 }
 
 // normalizeIndicatorByPath modifies indicatorByPath:
@@ -150,9 +156,12 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			continue
 		}
 
-		regularFiles, symlinkPaths, err := expandPath(pth)
+		regularFiles, symlinkPaths, dirPaths, err := expandPath(pth)
 		if err != nil {
 			return nil, err
+		}
+		for _, dir := range dirPaths {
+			normalized[dir] = "-"
 		}
 		for _, file := range regularFiles {
 			normalized[file] = indicator

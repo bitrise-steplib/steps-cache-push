@@ -350,8 +350,8 @@ workflows:
             # extract the archive
             tar -xPf /tmp/cache-archive.tar
 
-            if [ -d $CACHE_PATH/single_dir ]; then
-              echo "dir should not exist"
+            if [ ! -d $CACHE_PATH/single_dir ]; then
+              echo "dir should exist"
               exit 1
             fi
 
