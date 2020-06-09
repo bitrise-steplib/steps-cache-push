@@ -7,7 +7,7 @@ def md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-if len(sys.argv) != 1:
-    exit
+if (len(sys.argv) < 2):
+    sys.exit("File name parameter excepted")
 
 print(md5(sys.argv[1]))
