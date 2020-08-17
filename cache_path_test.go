@@ -507,50 +507,50 @@ func Test_match(t *testing.T) {
 		name             string
 		pth              string
 		excludeByPattern map[string]bool
-		doNotTrack       bool
+		ok               bool
 		exclude          bool
 	}{
 		{
 			name:             "simple no match",
 			pth:              "path/to/include",
 			excludeByPattern: map[string]bool{"path/to/exclude": false},
-			doNotTrack:       false,
+			ok:               false,
 			exclude:          false,
 		},
 		{
 			name:             "full match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/to/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "glob match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/*/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "glob match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"**/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "exclude",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/to/cache": true},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			doNotTrack, exclude := match(tt.pth, tt.excludeByPattern)
-			if doNotTrack != tt.doNotTrack {
-				t.Errorf("match() doNotTrack = %v, want %v", doNotTrack, tt.doNotTrack)
+			exclude, ok := match(tt.pth, tt.excludeByPattern)
+			if ok != tt.ok {
+				t.Errorf("match() ok = %v, want %v", ok, tt.ok)
 			}
 			if exclude != tt.exclude {
 				t.Errorf("match() exclude = %v, want %v", exclude, tt.exclude)
@@ -601,6 +601,14 @@ func Test_interleave(t *testing.T) {
 			name:                "exclude match, remove",
 			indicatorByPth:      map[string]string{"path/to/cache": "indicator/path"},
 			excludeByPattern:    map[string]bool{"path/to": true},
+			indicatorByCachePth: map[string]string{},
+		},
+		{
+			name:           "both ignore and exclude match, remove",
+			indicatorByPth: map[string]string{"path/to/cache.log": "indicator/path"},
+			excludeByPattern: map[string]bool{
+				"path/to": false,
+				"*.log":   true},
 			indicatorByCachePth: map[string]string{},
 		},
 	}

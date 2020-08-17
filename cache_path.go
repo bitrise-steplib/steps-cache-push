@@ -191,17 +191,24 @@ func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]boo
 
 // match reports whether the path matches to any of the given ignore items
 // and returns the exclude property of the matching ignore item.
-func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
-	for pattern, exclude := range excludeByPattern {
-		if strings.Contains(pattern, "*") && glob.Glob(pattern, pth) {
-			return true, exclude
+func match(pth string, excludeByPattern map[string]bool) (exclude bool, ok bool) {
+	matchFn := func(patternOrPath, subject string) bool {
+		if strings.Contains(patternOrPath, "*") {
+			return glob.Glob(patternOrPath, subject)
 		}
+		return strings.HasPrefix(subject, patternOrPath)
+	}
 
-		if !strings.Contains(pattern, "*") && strings.HasPrefix(pth, pattern) {
-			return true, exclude
+	for s, ex := range excludeByPattern {
+		if matchFn(s, pth) {
+			ok = true
+			if exclude == false {
+				exclude = ex
+			}
 		}
 	}
-	return false, false
+
+	return
 }
 
 // interleave matches the given include items with the ignore items and returns which path needs to be cached:
@@ -214,13 +221,13 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
-		skip, exclude := match(pth, excludeByPattern)
+		exclude, ok := match(pth, excludeByPattern)
 		if exclude {
 			// this file should not be included in the cache
 			continue
 		}
 
-		if skip || indicator == "-" {
+		if ok || indicator == "-" {
 			// this file's changes does not invalidate existing cache
 			indicator = ""
 		} else if len(indicator) == 0 {
