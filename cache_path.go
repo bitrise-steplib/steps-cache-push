@@ -179,6 +179,11 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]bool, error) {
 	normalized := map[string]bool{}
 	for pattern, exclude := range excludeByPattern {
+		if strings.HasPrefix(pattern, "*") {
+			normalized[pattern] = exclude
+			continue
+		}
+
 		pattern, err := pathutil.AbsPath(pattern)
 		if err != nil {
 			return nil, err

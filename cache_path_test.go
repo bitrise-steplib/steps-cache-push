@@ -476,15 +476,21 @@ func Test_normalizeExcludeByPattern(t *testing.T) {
 		wantErr          bool
 	}{
 		{
-			name:             "expands envs in pattern",
+			name:             "expands env",
 			excludeByPattern: map[string]bool{"/$NORMALIZE_EXCLUDE_BY_PATTERN_KEY/path/to/ignore": false},
 			normalized:       map[string]bool{"/test/path/to/ignore": false},
 			wantErr:          false,
 		},
 		{
-			name:             "expands pattern",
+			name:             "expands current dir",
 			excludeByPattern: map[string]bool{"path/to/ignore": false},
 			normalized:       map[string]bool{filepath.Join(currentDir, "path/to/ignore"): false},
+			wantErr:          false,
+		},
+		{
+			name:             "does not expand if starts with wildcard",
+			excludeByPattern: map[string]bool{"*.log": false},
+			normalized:       map[string]bool{"*.log": false},
 			wantErr:          false,
 		},
 	}
