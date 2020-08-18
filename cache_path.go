@@ -58,11 +58,17 @@ func parseIncludeList(list []string) map[string]string {
 func parseIgnoreList(list []string) map[string]bool {
 	ignoreByPath := map[string]bool{}
 	for _, item := range list {
-		pth, ignore := parseIgnoreListItem(item)
+		pth, exclude := parseIgnoreListItem(item)
 		if len(pth) == 0 {
 			continue
 		}
-		ignoreByPath[pth] = ignore
+
+		ex, ok := ignoreByPath[pth]
+		if ok && ex {
+			continue
+		}
+
+		ignoreByPath[pth] = exclude
 	}
 	return ignoreByPath
 }

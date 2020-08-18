@@ -230,6 +230,11 @@ func Test_parseIgnoreList(t *testing.T) {
 			list:             []string{"!"},
 			excludeByPattern: map[string]bool{},
 		},
+		{
+			name:             "same pattern different exclude option",
+			list:             []string{"!*.log", "*.log"},
+			excludeByPattern: map[string]bool{"*.log": true},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
