@@ -58,13 +58,31 @@ func main() {
 		logErrorfAndExit("Failed to parse include list: %s", err)
 	}
 
+	log.Debugf("Normalised include list:")
+	for path, indicator := range pathToIndicatorPath {
+		log.Debugf("%s -> %s", path, indicator)
+	}
+	log.Debugf("")
+
 	excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
 	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
 	if err != nil {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
+	log.Debugf("Normalised exclude list:")
+	for pattern, exclude := range excludeByPattern {
+		log.Debugf("%s: %v", pattern, exclude)
+	}
+	log.Debugf("")
+
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
+
+	log.Debugf("Interleaved cache list:")
+	for path, indicator := range pathToIndicatorPath {
+		log.Debugf("%s -> %s", path, indicator)
+	}
+	log.Debugf("")
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
