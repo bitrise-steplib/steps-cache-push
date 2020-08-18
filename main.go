@@ -12,9 +12,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 )
 
@@ -58,11 +60,20 @@ func main() {
 		logErrorfAndExit("Failed to parse include list: %s", err)
 	}
 
-	log.Debugf("Normalised include list:")
-	for path, indicator := range pathToIndicatorPath {
-		log.Debugf("%s -> %s", path, indicator)
+	{
+		// DEBUG: include list
+		var b strings.Builder
+		b.WriteString("Normalised include list:\n")
+		for path, indicator := range pathToIndicatorPath {
+			b.WriteString(fmt.Sprintf("%s -> %s\n", path, indicator))
+		}
+		pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "include_list.txt")
+		if err := fileutil.WriteStringToFile(pth, b.String()); err != nil {
+			log.Warnf("failed to write debug include list: %s", err)
+		} else {
+			log.Debugf("include list: %s", pth)
+		}
 	}
-	log.Debugf("")
 
 	excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
 	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
@@ -70,19 +81,37 @@ func main() {
 		logErrorfAndExit("Failed to parse ignore list: %s", err)
 	}
 
-	log.Debugf("Normalised exclude list:")
-	for pattern, exclude := range excludeByPattern {
-		log.Debugf("%s: %v", pattern, exclude)
+	{
+		// DEBUG: exclude list
+		var b strings.Builder
+		b.WriteString("Normalised exclude list:\n")
+		for pattern, exclude := range excludeByPattern {
+			b.WriteString(fmt.Sprintf("%s: %v\n", pattern, exclude))
+		}
+		pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "exclude_list.txt")
+		if err := fileutil.WriteStringToFile(pth, b.String()); err != nil {
+			log.Warnf("failed to write debug exclude list: %s", err)
+		} else {
+			log.Debugf("exclude list: %s", pth)
+		}
 	}
-	log.Debugf("")
 
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-	log.Debugf("Interleaved cache list:")
-	for path, indicator := range pathToIndicatorPath {
-		log.Debugf("%s -> %s", path, indicator)
+	{
+		// DEBUG: cache list
+		var b strings.Builder
+		b.WriteString("Interleaved cache list:\n")
+		for path, indicator := range pathToIndicatorPath {
+			b.WriteString(fmt.Sprintf("%s -> %s\n", path, indicator))
+		}
+		pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "cache_list.txt")
+		if err := fileutil.WriteStringToFile(pth, b.String()); err != nil {
+			log.Warnf("failed to write debug cache list: %s", err)
+		} else {
+			log.Debugf("cache list: %s", pth)
+		}
 	}
-	log.Debugf("")
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
