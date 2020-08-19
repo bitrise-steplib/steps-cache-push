@@ -177,6 +177,10 @@ func uploadArchive(pth, url string) error {
 	}
 	sizeInBytes := fi.Size()
 	log.Printf("Archive file size: %d bytes / %f MB", sizeInBytes, (float64(sizeInBytes) / 1024.0 / 1024.0))
+	data := map[string]interface{}{
+		"archive_size": sizeInBytes,
+	}
+	log.RInfof(stepID, "archive_size", data, "Size of cache archive: %d Bytes", sizeInBytes)
 
 	uploadURL, err := getCacheUploadURL(url, sizeInBytes)
 	if err != nil {
