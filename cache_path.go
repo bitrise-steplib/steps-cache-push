@@ -63,11 +63,6 @@ func parseIgnoreList(list []string) map[string]bool {
 			continue
 		}
 
-		ex, ok := ignoreByPath[pth]
-		if ok && ex {
-			continue
-		}
-
 		ignoreByPath[pth] = exclude
 	}
 	return ignoreByPath
