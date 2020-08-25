@@ -154,6 +154,7 @@ func main() {
 		dirSize, err := dirSize(pth)
 		if err == nil && dirSize > 1073741824 {
 			pathsExceedingGB++
+			log.Debugf("Found a path exceeding 1 GB: %s", pth)
 		} else if err != nil {
 			log.Warnf("Failed to measure size of cached path: %s", pth)
 		}
@@ -162,6 +163,7 @@ func main() {
 		"paths_exceeding_1gb": pathsExceedingGB,
 	}
 	log.RInfof(stepID, "paths_exceeding_1gb", data, "number of cached paths exceeding 1 GB: %d", pathsExceedingGB)
+	log.Debugf("Number of cached paths exceeding 1 GB: %d", pathsExceedingGB)
 
 	// Generate cache archive
 	startTime = time.Now()
