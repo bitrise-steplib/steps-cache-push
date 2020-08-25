@@ -12,6 +12,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,6 +29,20 @@ const (
 func logErrorfAndExit(format string, args ...interface{}) {
 	log.Errorf(format, args...)
 	os.Exit(1)
+}
+
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }
 
 func main() {
@@ -132,6 +147,21 @@ func main() {
 			os.Exit(0)
 		}
 	}
+
+	// Log >1GB paths
+	pathsExceedingGB := 0
+	for pth := range pathToIndicatorPath {
+		dirSize, err := dirSize(pth)
+		if err == nil && dirSize > 1073741824 {
+			pathsExceedingGB++
+		} else if err != nil {
+			log.Warnf("Failed to measure size of cached path: %s", pth)
+		}
+	}
+	data := map[string]interface{}{
+		"paths_exceeding_1gb": pathsExceedingGB,
+	}
+	log.RInfof(stepID, "paths_exceeding_1gb", data, "number of cached paths exceeding 1 GB: %d", pathsExceedingGB)
 
 	// Generate cache archive
 	startTime = time.Now()
