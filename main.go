@@ -10,6 +10,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -92,6 +93,19 @@ func main() {
 	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
 	if err != nil {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
+	}
+
+	{
+		// DEBUG
+		b, err := json.MarshalIndent(curDescriptor, "", " ")
+		if err != nil {
+			log.Warnf("failed to marshal cache descriptor: %s", err)
+		} else {
+			pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "cache_descriptor.txt")
+			if err := fileutil.WriteBytesToFile(pth, b); err != nil {
+				log.Warnf("failed to write cache descriptor: %s", err)
+			}
+		}
 	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
