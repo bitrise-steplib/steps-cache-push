@@ -203,9 +203,7 @@ func match(pth string, excludeByPattern map[string]bool) (exclude bool, ok bool)
 	for s, ex := range excludeByPattern {
 		if matchFn(s, pth) {
 			ok = true
-			if exclude == false {
-				exclude = ex
-			}
+			exclude = ex
 		}
 	}
 

@@ -493,9 +493,9 @@ func Test_normalizeExcludeByPattern(t *testing.T) {
 			wantErr:          false,
 		},
 		{
-			name:             "does not expand if starts with wildcard",
+			name:             "expands if starts with wildcard",
 			excludeByPattern: map[string]bool{"*.log": false},
-			normalized:       map[string]bool{"*.log": false},
+			normalized:       map[string]bool{filepath.Join(currentDir, "*.log"): false},
 			wantErr:          false,
 		},
 	}
