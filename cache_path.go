@@ -63,11 +63,6 @@ func parseIgnoreList(list []string) map[string]bool {
 			continue
 		}
 
-		ex, ok := ignoreByPath[pth]
-		if ok && ex {
-			continue
-		}
-
 		ignoreByPath[pth] = exclude
 	}
 	return ignoreByPath
@@ -208,7 +203,9 @@ func match(pth string, excludeByPattern map[string]bool) (exclude bool, ok bool)
 	for s, ex := range excludeByPattern {
 		if matchFn(s, pth) {
 			ok = true
-			exclude = ex
+			if exclude == false {
+				exclude = ex
+			}
 		}
 	}
 
