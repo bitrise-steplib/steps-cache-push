@@ -50,6 +50,7 @@ func compare(old map[string]string, new map[string]string) result {
 		newIndicator, ok := newCopy[oldPth]
 		switch {
 		case !ok && oldIndicator == "-":
+			fmt.Println("ignored path to be removed: ", oldPth)
 			result.removedIgnored = append(result.removedIgnored, oldPth)
 		case !ok:
 			result.removed = append(result.removed, oldPth)
