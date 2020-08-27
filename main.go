@@ -23,7 +23,7 @@ const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
 	stackVersionsPath = "/tmp/archive_info.json"
-	stepID            = "steps-cache-pull"
+	stepID            = "cache-pull"
 )
 
 func logErrorfAndExit(format string, args ...interface{}) {
