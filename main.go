@@ -10,14 +10,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 )
 
@@ -88,19 +85,6 @@ func main() {
 
 	if prevDescriptor != nil {
 		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
-
-		{
-			// DEBUG
-			b, err := json.MarshalIndent(prevDescriptor, "", " ")
-			if err != nil {
-				log.Warnf("failed to marshal cache descriptor: %s", err)
-			} else {
-				pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "prev_cache_descriptor.txt")
-				if err := fileutil.WriteBytesToFile(pth, b); err != nil {
-					log.Warnf("failed to write cache descriptor: %s", err)
-				}
-			}
-		}
 	} else {
 		log.Printf("No previous cache info found")
 	}
@@ -108,19 +92,6 @@ func main() {
 	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
 	if err != nil {
 		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
-	}
-
-	{
-		// DEBUG
-		b, err := json.MarshalIndent(curDescriptor, "", " ")
-		if err != nil {
-			log.Warnf("failed to marshal cache descriptor: %s", err)
-		} else {
-			pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "current_cache_descriptor.txt")
-			if err := fileutil.WriteBytesToFile(pth, b); err != nil {
-				log.Warnf("failed to write cache descriptor: %s", err)
-			}
-		}
 	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
