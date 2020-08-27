@@ -88,6 +88,19 @@ func main() {
 
 	if prevDescriptor != nil {
 		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
+
+		{
+			// DEBUG
+			b, err := json.MarshalIndent(prevDescriptor, "", " ")
+			if err != nil {
+				log.Warnf("failed to marshal cache descriptor: %s", err)
+			} else {
+				pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "prev_cache_descriptor.txt")
+				if err := fileutil.WriteBytesToFile(pth, b); err != nil {
+					log.Warnf("failed to write cache descriptor: %s", err)
+				}
+			}
+		}
 	} else {
 		log.Printf("No previous cache info found")
 	}
@@ -103,7 +116,7 @@ func main() {
 		if err != nil {
 			log.Warnf("failed to marshal cache descriptor: %s", err)
 		} else {
-			pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "cache_descriptor.txt")
+			pth := filepath.Join(os.Getenv("BITRISE_DEPLOY_DIR"), "current_cache_descriptor.txt")
 			if err := fileutil.WriteBytesToFile(pth, b); err != nil {
 				log.Warnf("failed to write cache descriptor: %s", err)
 			}
