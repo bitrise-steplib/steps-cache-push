@@ -112,8 +112,6 @@ func main() {
 
 		log.Warnf("%d files needs to be removed", len(result.removed))
 		logDebugPaths(result.removed)
-		log.Warnf("%d ignored files needs to be removed", len(result.removedIgnored))
-		logDebugPaths(result.removedIgnored)
 		log.Warnf("%d files has changed", len(result.changed))
 		logDebugPaths(result.changed)
 		log.Warnf("%d files added", len(result.added))

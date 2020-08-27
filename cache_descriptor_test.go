@@ -213,7 +213,7 @@ func Test_result_hasChanges(t *testing.T) {
 		{
 			name:            "ignored removed",
 			removedIgnored:  []string{"pth"},
-			triggerNewCache: true,
+			triggerNewCache: false,
 		},
 		{
 			name:            "matching",

@@ -35,7 +35,7 @@ type result struct {
 
 // hasChanges reports whether a new cache needs to be generated or not.
 func (r result) hasChanges() bool {
-	return len(r.removed) > 0 || len(r.removedIgnored) > 0 || len(r.changed) > 0 || len(r.added) > 0
+	return len(r.removed) > 0 || len(r.changed) > 0 || len(r.added) > 0
 }
 
 // compare compares two cache descriptor file and return the differences.
