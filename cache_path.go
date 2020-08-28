@@ -190,26 +190,25 @@ func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]boo
 	return normalized, nil
 }
 
+func patternOrPrefixMatch(patternOrPath, subject string) bool {
+	if strings.Contains(patternOrPath, "*") {
+		return glob.Glob(patternOrPath, subject)
+	}
+	return strings.HasPrefix(subject, patternOrPath)
+}
+
 // match reports whether the path matches to any of the given ignore items
 // and returns the exclude property of the matching ignore item.
 func match(pth string, excludeByPattern map[string]bool) (exclude bool, ok bool) {
-	matchFn := func(patternOrPath, subject string) bool {
-		if strings.Contains(patternOrPath, "*") {
-			return glob.Glob(patternOrPath, subject)
-		}
-		return strings.HasPrefix(subject, patternOrPath)
-	}
-
 	for s, ex := range excludeByPattern {
-		if matchFn(s, pth) {
+		if patternOrPrefixMatch(s, pth) {
 			ok = true
 			exclude = ex
-			if exclude == true {
+			if exclude {
 				return
 			}
 		}
 	}
-
 	return
 }
 
