@@ -307,6 +307,9 @@ workflows:
             # file in root
             echo "content" > $CACHE_PATH/test_file1.txt
 
+            # big file in root
+            head -c 1073741825 </dev/urandom > $CACHE_PATH/test_big_random_file1.data
+
             # file in subdir
             mkdir $CACHE_PATH/subdir
             echo "content" > $CACHE_PATH/subdir/test_file.mp3
@@ -359,6 +362,11 @@ workflows:
             fi
 
             if [ ! -f $CACHE_PATH/test_file1.txt ]; then
+              echo "file should exist"
+              exit 1
+            fi
+
+            if [ ! -f $CACHE_PATH/test_big_random_file1.data ]; then
               echo "file should exist"
               exit 1
             fi
