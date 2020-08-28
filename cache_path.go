@@ -58,11 +58,12 @@ func parseIncludeList(list []string) map[string]string {
 func parseIgnoreList(list []string) map[string]bool {
 	ignoreByPath := map[string]bool{}
 	for _, item := range list {
-		pth, ignore := parseIgnoreListItem(item)
+		pth, exclude := parseIgnoreListItem(item)
 		if len(pth) == 0 {
 			continue
 		}
-		ignoreByPath[pth] = ignore
+
+		ignoreByPath[pth] = exclude
 	}
 	return ignoreByPath
 }
@@ -189,19 +190,26 @@ func normalizeExcludeByPattern(excludeByPattern map[string]bool) (map[string]boo
 	return normalized, nil
 }
 
+func patternOrPrefixMatch(patternOrPath, subject string) bool {
+	if strings.Contains(patternOrPath, "*") {
+		return glob.Glob(patternOrPath, subject)
+	}
+	return strings.HasPrefix(subject, patternOrPath)
+}
+
 // match reports whether the path matches to any of the given ignore items
 // and returns the exclude property of the matching ignore item.
-func match(pth string, excludeByPattern map[string]bool) (bool, bool) {
-	for pattern, exclude := range excludeByPattern {
-		if strings.Contains(pattern, "*") && glob.Glob(pattern, pth) {
-			return true, exclude
-		}
-
-		if !strings.Contains(pattern, "*") && strings.HasPrefix(pth, pattern) {
-			return true, exclude
+func match(pth string, excludeByPattern map[string]bool) (exclude bool, ok bool) {
+	for s, ex := range excludeByPattern {
+		if patternOrPrefixMatch(s, pth) {
+			ok = true
+			exclude = ex
+			if exclude {
+				return
+			}
 		}
 	}
-	return false, false
+	return
 }
 
 // interleave matches the given include items with the ignore items and returns which path needs to be cached:
@@ -214,13 +222,13 @@ func interleave(indicatorByPth map[string]string, excludeByPattern map[string]bo
 	indicatorByCachePth := map[string]string{}
 
 	for pth, indicator := range indicatorByPth {
-		skip, exclude := match(pth, excludeByPattern)
+		exclude, ok := match(pth, excludeByPattern)
 		if exclude {
 			// this file should not be included in the cache
 			continue
 		}
 
-		if skip || indicator == "-" {
+		if ok || indicator == "-" {
 			// this file's changes does not invalidate existing cache
 			indicator = ""
 		} else if len(indicator) == 0 {

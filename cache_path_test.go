@@ -476,15 +476,21 @@ func Test_normalizeExcludeByPattern(t *testing.T) {
 		wantErr          bool
 	}{
 		{
-			name:             "expands envs in pattern",
+			name:             "expands env",
 			excludeByPattern: map[string]bool{"/$NORMALIZE_EXCLUDE_BY_PATTERN_KEY/path/to/ignore": false},
 			normalized:       map[string]bool{"/test/path/to/ignore": false},
 			wantErr:          false,
 		},
 		{
-			name:             "expands pattern",
+			name:             "expands current dir",
 			excludeByPattern: map[string]bool{"path/to/ignore": false},
 			normalized:       map[string]bool{filepath.Join(currentDir, "path/to/ignore"): false},
+			wantErr:          false,
+		},
+		{
+			name:             "expands if starts with wildcard",
+			excludeByPattern: map[string]bool{"*.log": false},
+			normalized:       map[string]bool{filepath.Join(currentDir, "*.log"): false},
 			wantErr:          false,
 		},
 	}
@@ -507,50 +513,50 @@ func Test_match(t *testing.T) {
 		name             string
 		pth              string
 		excludeByPattern map[string]bool
-		doNotTrack       bool
+		ok               bool
 		exclude          bool
 	}{
 		{
 			name:             "simple no match",
 			pth:              "path/to/include",
 			excludeByPattern: map[string]bool{"path/to/exclude": false},
-			doNotTrack:       false,
+			ok:               false,
 			exclude:          false,
 		},
 		{
 			name:             "full match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/to/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "glob match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/*/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "glob match",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"**/cache": false},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          false,
 		},
 		{
 			name:             "exclude",
 			pth:              "path/to/cache",
 			excludeByPattern: map[string]bool{"path/to/cache": true},
-			doNotTrack:       true,
+			ok:               true,
 			exclude:          true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			doNotTrack, exclude := match(tt.pth, tt.excludeByPattern)
-			if doNotTrack != tt.doNotTrack {
-				t.Errorf("match() doNotTrack = %v, want %v", doNotTrack, tt.doNotTrack)
+			exclude, ok := match(tt.pth, tt.excludeByPattern)
+			if ok != tt.ok {
+				t.Errorf("match() ok = %v, want %v", ok, tt.ok)
 			}
 			if exclude != tt.exclude {
 				t.Errorf("match() exclude = %v, want %v", exclude, tt.exclude)
@@ -601,6 +607,14 @@ func Test_interleave(t *testing.T) {
 			name:                "exclude match, remove",
 			indicatorByPth:      map[string]string{"path/to/cache": "indicator/path"},
 			excludeByPattern:    map[string]bool{"path/to": true},
+			indicatorByCachePth: map[string]string{},
+		},
+		{
+			name:           "both ignore and exclude match, remove",
+			indicatorByPth: map[string]string{"path/to/cache.log": "indicator/path"},
+			excludeByPattern: map[string]bool{
+				"path/to": false,
+				"*.log":   true},
 			indicatorByCachePth: map[string]string{},
 		},
 	}
