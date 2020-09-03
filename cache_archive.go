@@ -25,7 +25,7 @@ type Archive struct {
 	file  *os.File
 	tar   *tar.Writer
 	gzip  *gzip.Writer
-	falib *falib.NewArchiver
+	falib *falib.Archiver
 }
 
 // NewArchive creates a instance of Archive.
@@ -37,7 +37,7 @@ func NewArchive(pth string, useFastArchiver bool, compress bool) (*Archive, erro
 
 	var tarWriter *tar.Writer
 	var gzipWriter *gzip.Writer
-	var fastArchiver *falib.NewArchiver
+	var fastArchiver *falib.Archiver
 	if useFastArchiver {
 	    fastArchiver := falib.NewArchiver(file)
 	} else if compress {
@@ -63,7 +63,7 @@ func (a *Archive) Write(pathToIndicator map[string]string) error {
 	for pth := range pathToIndicator {
         // Archive using fastArchiver
         if a.falib != nil {
-           if err = a.falib.AddDir(pth); err != nil {
+           if err := a.falib.AddDir(pth); err != nil {
                return fmt.Errorf("failed to add dir to fast archiver, error: %s, path: %s", err, pth)
            }
         }
