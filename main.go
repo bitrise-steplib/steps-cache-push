@@ -155,8 +155,7 @@ func main() {
         }
 
         archive := falib.NewArchiver(outputFile)
-        for pth := range pathToIndicatorPath {
-            log.Printf("Adding Dir: %s", pth)
+        for pth := range parseIncludeList(strings.Split(configs.Paths, "\n")) {
         	archive.AddDir(pth)
         }
 
