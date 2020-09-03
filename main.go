@@ -144,8 +144,8 @@ func main() {
 
         // Use Fast Archiver
         var outputFile *os.File
-        if *cacheArchivePath != "" {
-        	file, err := os.Create(*cacheArchivePath)
+        if cacheArchivePath != "" {
+        	file, err := os.Create(cacheArchivePath)
         	if err != nil {
         		logErrorfAndExit("Error creating output file:", err.Error())
         	}
@@ -154,8 +154,8 @@ func main() {
         	outputFile = os.Stdout
         }
 
-        archive := falib.NewArchiver(file)
-        for pth := range pathToIndicator {
+        archive := falib.NewArchiver(outputFile)
+        for pth := range pathToIndicatorPath {
             log.Printf("Adding Dir: %s", pth)
         	archive.AddDir(pth)
         }
