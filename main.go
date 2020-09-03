@@ -171,7 +171,7 @@ func main() {
 
 	log.Infof("Uploading cache archive")
 
-	if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL); err != nil {
+	if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL, configs.BuildSlug); err != nil {
 		logErrorfAndExit("Failed to upload archive: %s", err)
 	}
 	log.Donef("Done in %s\n", time.Since(startTime))
