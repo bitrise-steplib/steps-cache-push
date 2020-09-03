@@ -163,6 +163,8 @@ inputs:
       summary: "If true will use fast archive. This does not compress the file"
       description: |-
         If true will use fast archive. This does not compress the file.
+        When using fast archive, it can't use Absolute Path, such as: /Users/vagrant/xxx/
+        Use local path instead ex: path/to/cache
       is_required: true
       value_options:
         - "true"
