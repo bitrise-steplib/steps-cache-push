@@ -16,41 +16,37 @@ func TestNewArchive(t *testing.T) {
 	pth := filepath.Join(tmpDir, "cache.gzip")
 
 	tests := []struct {
-		name            string
-		pth             string
-		fastArchiver    bool
-		compress        bool
-		wantGzip        bool
-		wantErr         bool
+		name     string
+		pth      string
+		compress bool
+		wantGzip bool
+		wantErr  bool
 	}{
 		{
-			name:         "no path provided",
-			pth:          "",
-			fastArchiver: true,
-			compress:     false,
-			wantGzip:     false,
-			wantErr:      true,
+			name:     "no path provided",
+			pth:      "",
+			compress: false,
+			wantGzip: false,
+			wantErr:  true,
 		},
 		{
-			name:         "no compress",
-			pth:          pth,
-			fastArchiver: true,
-			compress:     false,
-			wantGzip:     false,
-			wantErr:      false,
+			name:     "no compress",
+			pth:      pth,
+			compress: false,
+			wantGzip: false,
+			wantErr:  false,
 		},
 		{
-			name:         "compress",
-			pth:          pth,
-			fastArchiver: false,
-			compress:     true,
-			wantGzip:     true,
-			wantErr:      false,
+			name:     "compress",
+			pth:      pth,
+			compress: true,
+			wantGzip: true,
+			wantErr:  false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewArchive(tt.pth, tt.fastArchiver, tt.compress)
+			got, err := NewArchive(tt.pth, tt.compress)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewArchive() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -75,7 +71,7 @@ func TestArchive_Write(t *testing.T) {
 
 	t.Log("no compress")
 	{
-		archive, err := NewArchive(pth, true, false)
+		archive, err := NewArchive(pth, false)
 		if err != nil {
 			t.Fatalf("failed to create archive: %s", err)
 		}
@@ -87,7 +83,7 @@ func TestArchive_Write(t *testing.T) {
 
 	t.Log("compress")
 	{
-		archive, err := NewArchive(pth, false, true)
+		archive, err := NewArchive(pth, true)
 		if err != nil {
 			t.Fatalf("failed to create archive: %s", err)
 		}
@@ -108,7 +104,7 @@ func TestArchive_WriteHeader(t *testing.T) {
 	fileToArchive := filepath.Join(tmpDir, "file")
 	createDirStruct(t, map[string]string{fileToArchive: ""})
 
-	archive, err := NewArchive(pth, true, false)
+	archive, err := NewArchive(pth, false)
 	if err != nil {
 		t.Fatalf("failed to create archive: %s", err)
 	}
@@ -130,7 +126,7 @@ func TestArchive_Close(t *testing.T) {
 
 	t.Log("no compress")
 	{
-		archive, err := NewArchive(pth, true, false)
+		archive, err := NewArchive(pth, false)
 		if err != nil {
 			t.Fatalf("failed to create archive: %s", err)
 		}
@@ -146,7 +142,7 @@ func TestArchive_Close(t *testing.T) {
 
 	t.Log("compress")
 	{
-		archive, err := NewArchive(pth, false, true)
+		archive, err := NewArchive(pth, true)
 		if err != nil {
 			t.Fatalf("failed to create archive: %s", err)
 		}

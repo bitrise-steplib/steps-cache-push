@@ -17,7 +17,6 @@ import (
 
 	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/log"
-	"github.com/replicon/fast-archiver/falib"
 )
 
 // Archive represents a cache archive.
@@ -25,11 +24,10 @@ type Archive struct {
 	file  *os.File
 	tar   *tar.Writer
 	gzip  *gzip.Writer
-	falib *falib.Archiver
 }
 
 // NewArchive creates a instance of Archive.
-func NewArchive(pth string, useFastArchiver bool, compress bool) (*Archive, error) {
+func NewArchive(pth string, compress bool) (*Archive, error) {
 	file, err := os.Create(pth)
 	if err != nil {
 		return nil, err
@@ -37,10 +35,7 @@ func NewArchive(pth string, useFastArchiver bool, compress bool) (*Archive, erro
 
 	var tarWriter *tar.Writer
 	var gzipWriter *gzip.Writer
-	var fastArchiver *falib.Archiver
-	if useFastArchiver {
-	    fastArchiver := falib.NewArchiver(file)
-	} else if compress {
+	if compress {
 		gzipWriter, err = gzip.NewWriterLevel(file, gzip.BestCompression)
 		if err != nil {
 			return nil, err
@@ -54,31 +49,15 @@ func NewArchive(pth string, useFastArchiver bool, compress bool) (*Archive, erro
 		file: file,
 		tar:  tarWriter,
 		gzip: gzipWriter,
-		falib: fastArchiver,
 	}, nil
 }
 
 // Write writes the given files in the cache archive.
 func (a *Archive) Write(pathToIndicator map[string]string) error {
 	for pth := range pathToIndicator {
-        // Archive using fastArchiver
-        if a.falib != nil {
-           if err := a.falib.AddDir(pth); err != nil {
-               return fmt.Errorf("failed to add dir to fast archiver, error: %s, path: %s", err, pth)
-           }
-        }
-
-	    // Archive using tar
 		if err := a.writeOne(pth); err != nil {
 			return err
 		}
-	}
-
-    // Run the archiver for falib
-	if a.falib != nil {
-	    if err := a.falib.Run(); err != nil {
-	        return fmt.Errorf("failed to create archive with fast archiver, error: %s", err)
-	    }
 	}
 
 	return nil
@@ -154,11 +133,6 @@ func (a *Archive) writeData(data []byte, descriptorPth string) error {
 		ModTime:  time.Now(),
 	}
 
-    // Return noop. since fastArchiver doesn't need this
-	if a.falib != nil {
-	    return nil
-	}
-
 	if err := a.tar.WriteHeader(header); err != nil {
 		return err
 	}
@@ -171,11 +145,10 @@ func (a *Archive) writeData(data []byte, descriptorPth string) error {
 
 // Close closes the archive.
 func (a *Archive) Close() error {
-    if a.tar != nil {
-        if err := a.tar.Close(); err != nil {
-        	return err
-        }
-    }
+
+	if err := a.tar.Close(); err != nil {
+		return err
+	}
 
 	if a.gzip != nil {
 		if err := a.gzip.Close(); err != nil {

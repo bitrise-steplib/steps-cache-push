@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/bitrise-io/go-utils/log"
+	"github.com/replicon/fast-archiver/falib"
 )
 
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
-	cacheArchivePath  = "/tmp/cache-archive.tar"
 	stackVersionsPath = "/tmp/archive_info.json"
 	stepID            = "cache-push"
 )
@@ -138,30 +138,65 @@ func main() {
 
 	log.Infof("Generating cache archive")
 
-	archive, err := NewArchive(cacheArchivePath, configs.UseFastArchiver == "true", configs.CompressArchive == "true")
-	if err != nil {
-		logErrorfAndExit("Failed to create archive: %s", err)
-	}
+	cacheArchivePath := ""
+	if configs.UseFastArchiver == "true" {
+	    cacheArchivePath = "/tmp/cache-archive.fast-archive"
 
-	stackData, err := stackVersionData(configs.StackID)
-	if err != nil {
-		logErrorfAndExit("Failed to get stack version info: %s", err)
-	}
-	// This is the first file written, to speed up reading it in subsequent builds
-	if err = archive.writeData(stackData, stackVersionsPath); err != nil {
-		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
-	}
+        // Use Fast Archiver
+        var outputFile *os.File
+        if *cacheArchivePath != "" {
+        	file, err := os.Create(*cacheArchivePath)
+        	if err != nil {
+        		logErrorfAndExit("Error creating output file:", err.Error())
+        	}
+        	outputFile = file
+        } else {
+        	outputFile = os.Stdout
+        }
 
-	if err := archive.Write(pathToIndicatorPath); err != nil {
-		logErrorfAndExit("Failed to populate archive: %s", err)
-	}
+        archive := falib.NewArchiver(file)
+        for pth := range pathToIndicator {
+            log.Printf("Adding Dir: %s", pth)
+        	if err := archive.AddDir(pth); err != nil {
+        		return err
+        	}
+        }
 
-	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
-		logErrorfAndExit("Failed to write archive header: %s", err)
-	}
+        err := archive.Run()
+        if err != nil {
+        	logErrorfAndExit("Fatal error in fast archiver:", err.Error())
+        }
+        outputFile.Close()
 
-	if err := archive.Close(); err != nil {
-		logErrorfAndExit("Failed to close archive: %s", err)
+	} else {
+	    cacheArchivePath = "/tmp/cache-archive.tar"
+
+	    // Use tar Archiver
+        archive, err := NewArchive(cacheArchivePath, configs.CompressArchive == "true")
+        	if err != nil {
+        		logErrorfAndExit("Failed to create archive: %s", err)
+        	}
+
+        	stackData, err := stackVersionData(configs.StackID)
+        	if err != nil {
+        		logErrorfAndExit("Failed to get stack version info: %s", err)
+        	}
+        	// This is the first file written, to speed up reading it in subsequent builds
+        	if err = archive.writeData(stackData, stackVersionsPath); err != nil {
+        		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
+        	}
+
+        	if err := archive.Write(pathToIndicatorPath); err != nil {
+        		logErrorfAndExit("Failed to populate archive: %s", err)
+        	}
+
+        	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
+        		logErrorfAndExit("Failed to write archive header: %s", err)
+        	}
+
+        	if err := archive.Close(); err != nil {
+        		logErrorfAndExit("Failed to close archive: %s", err)
+        	}
 	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
