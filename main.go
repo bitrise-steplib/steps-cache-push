@@ -157,9 +157,7 @@ func main() {
         archive := falib.NewArchiver(file)
         for pth := range pathToIndicator {
             log.Printf("Adding Dir: %s", pth)
-        	if err := archive.AddDir(pth); err != nil {
-        		return err
-        	}
+        	archive.AddDir(pth)
         }
 
         err := archive.Run()
