@@ -43,6 +43,17 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:0f5b895e258e1eb763b4949a42dda9ef4e4bb93bac0735534901c5d5c64d101a"
+  name = "github.com/replicon/fast-archiver"
+  packages = [
+    ".",
+    "falib",
+  ]
+  pruneopts = "UT"
+  revision = "9b24e4dcc247161e10eaa4e841554e83fe5ff249"
+  version = "v1.02"
+
+[[projects]]
   digest = "1:6baa565fe16f8657cf93469b2b8a6c61a277827734400d27e44d589547297279"
   name = "github.com/ryanuber/go-glob"
   packages = ["."]
@@ -78,6 +89,7 @@
     "github.com/bitrise-io/go-utils/fileutil",
     "github.com/bitrise-io/go-utils/log",
     "github.com/bitrise-io/go-utils/pathutil",
+    "github.com/replicon/fast-archiver",
     "github.com/ryanuber/go-glob",
     "github.com/stretchr/testify/require",
   ]

@@ -157,6 +157,16 @@ inputs:
       value_options:
       - "true"
       - "false"
+  - use_fast_archive: "true"
+    opts:
+      title: "Use Fast Archiver?"
+      summary: "If true will use fast archive. This does not compress the file"
+      description: |-
+        If true will use fast archive. This does not compress the file.
+      is_required: true
+      value_options:
+        - "true"
+        - "false"
   - compress_archive: "false"
     opts:
       title: "Compress cache?"

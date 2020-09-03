@@ -138,7 +138,7 @@ func main() {
 
 	log.Infof("Generating cache archive")
 
-	archive, err := NewArchive(cacheArchivePath, configs.CompressArchive == "true")
+	archive, err := NewArchive(cacheArchivePath, configs.UseFastArchiver == "true", configs.CompressArchive == "true")
 	if err != nil {
 		logErrorfAndExit("Failed to create archive: %s", err)
 	}

@@ -18,3 +18,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/replicon/fast-archiver"
+  version = "1.2.0"
