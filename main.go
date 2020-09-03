@@ -43,106 +43,14 @@ func main() {
 
 	log.SetEnableDebugLog(configs.DebugMode)
 
-	// Cleaning paths
-	startTime := time.Now()
+    cacheArchivePath := ""
+    startTime := time.Now()
 
-	log.Infof("Cleaning paths")
-
-	pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
-	if len(pathToIndicatorPath) == 0 {
-		log.Warnf("No path to cache, skip caching...")
-		os.Exit(0)
-	}
-
-	pathToIndicatorPath, err = normalizeIndicatorByPath(pathToIndicatorPath)
-	if err != nil {
-		logErrorfAndExit("Failed to parse include list: %s", err)
-	}
-
-	excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
-	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
-	if err != nil {
-		logErrorfAndExit("Failed to parse ignore list: %s", err)
-	}
-
-	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
-
-	log.Donef("Done in %s\n", time.Since(startTime))
-
-	if len(pathToIndicatorPath) == 0 {
-		log.Warnf("No path to cache, skip caching...")
-		os.Exit(0)
-	}
-
-	// Check previous cache
-	startTime = time.Now()
-
-	log.Infof("Checking previous cache status")
-
-	prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
-	if err != nil {
-		logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
-	}
-
-	if prevDescriptor != nil {
-		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
-	} else {
-		log.Printf("No previous cache info found")
-	}
-
-	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
-	if err != nil {
-		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
-	}
-
-	log.Donef("Done in %s\n", time.Since(startTime))
-
-	// Checking file changes
-	if prevDescriptor != nil {
-		startTime = time.Now()
-
-		log.Infof("Checking for file changes")
-
-		logDebugPaths := func(paths []string) {
-			for _, pth := range paths {
-				log.Debugf("- %s", pth)
-			}
-		}
-
-		result := compare(prevDescriptor, curDescriptor)
-
-		log.Warnf("%d files needs to be removed", len(result.removed))
-		logDebugPaths(result.removed)
-		log.Warnf("%d files has changed", len(result.changed))
-		logDebugPaths(result.changed)
-		log.Warnf("%d files added", len(result.added))
-		logDebugPaths(result.added)
-		log.Debugf("%d ignored files removed", len(result.removedIgnored))
-		logDebugPaths(result.removedIgnored)
-		log.Debugf("%d files did not change", len(result.matching))
-		logDebugPaths(result.matching)
-		log.Debugf("%d ignored files added", len(result.addedIgnored))
-		logDebugPaths(result.addedIgnored)
-
-		if result.hasChanges() {
-			log.Donef("File changes found in %s\n", time.Since(startTime))
-		} else {
-			log.Donef("No files found in %s\n", time.Since(startTime))
-			log.Printf("Total time: %s", time.Since(stepStartedAt))
-			os.Exit(0)
-		}
-	}
-
-	// Generate cache archive
-	startTime = time.Now()
-
-	log.Infof("Generating cache archive")
-
-	cacheArchivePath := ""
 	if configs.UseFastArchiver == "true" {
-	    cacheArchivePath = "/tmp/cache-archive.fast-archive"
+	    // Use Fast Archiver
 
-        // Use Fast Archiver
+        log.Infof("Using fast archive... Generating archive")
+        cacheArchivePath = "/tmp/cache-archive.fast-archive"
         var outputFile *os.File
         if cacheArchivePath != "" {
         	file, err := os.Create(cacheArchivePath)
@@ -165,38 +73,132 @@ func main() {
         }
         outputFile.Close()
 
+        log.Donef("Done in %s\n", time.Since(startTime))
 	} else {
-	    cacheArchivePath = "/tmp/cache-archive.tar"
+	    // Use Tar Archiver
 
-	    // Use tar Archiver
+        // Cleaning paths
+    	log.Infof("Cleaning paths")
+
+    	pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
+    	if len(pathToIndicatorPath) == 0 {
+    		log.Warnf("No path to cache, skip caching...")
+    		os.Exit(0)
+    	}
+
+    	pathToIndicatorPath, err = normalizeIndicatorByPath(pathToIndicatorPath)
+    	if err != nil {
+    		logErrorfAndExit("Failed to parse include list: %s", err)
+    	}
+
+    	excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
+    	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
+    	if err != nil {
+    		logErrorfAndExit("Failed to parse ignore list: %s", err)
+    	}
+
+    	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
+
+    	log.Donef("Done in %s\n", time.Since(startTime))
+
+    	if len(pathToIndicatorPath) == 0 {
+    		log.Warnf("No path to cache, skip caching...")
+    		os.Exit(0)
+    	}
+
+    	// Check previous cache
+    	startTime = time.Now()
+
+    	log.Infof("Checking previous cache status")
+
+    	prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
+    	if err != nil {
+    		logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
+    	}
+
+    	if prevDescriptor != nil {
+    		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
+    	} else {
+    		log.Printf("No previous cache info found")
+    	}
+
+    	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
+    	if err != nil {
+    		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
+    	}
+
+    	log.Donef("Done in %s\n", time.Since(startTime))
+
+    	// Checking file changes
+    	if prevDescriptor != nil {
+    		startTime = time.Now()
+
+    		log.Infof("Checking for file changes")
+
+    		logDebugPaths := func(paths []string) {
+    			for _, pth := range paths {
+    				log.Debugf("- %s", pth)
+    			}
+    		}
+
+    		result := compare(prevDescriptor, curDescriptor)
+
+    		log.Warnf("%d files needs to be removed", len(result.removed))
+    		logDebugPaths(result.removed)
+    		log.Warnf("%d files has changed", len(result.changed))
+    		logDebugPaths(result.changed)
+    		log.Warnf("%d files added", len(result.added))
+    		logDebugPaths(result.added)
+    		log.Debugf("%d ignored files removed", len(result.removedIgnored))
+    		logDebugPaths(result.removedIgnored)
+    		log.Debugf("%d files did not change", len(result.matching))
+    		logDebugPaths(result.matching)
+    		log.Debugf("%d ignored files added", len(result.addedIgnored))
+    		logDebugPaths(result.addedIgnored)
+
+    		if result.hasChanges() {
+    			log.Donef("File changes found in %s\n", time.Since(startTime))
+    		} else {
+    			log.Donef("No files found in %s\n", time.Since(startTime))
+    			log.Printf("Total time: %s", time.Since(stepStartedAt))
+    			os.Exit(0)
+    		}
+    	}
+
+    	// Generate cache archive
+    	startTime = time.Now()
+
+    	log.Infof("Generating cache archive")
+        cacheArchivePath = "/tmp/cache-archive.tar"
+
         archive, err := NewArchive(cacheArchivePath, configs.CompressArchive == "true")
-        	if err != nil {
-        		logErrorfAndExit("Failed to create archive: %s", err)
-        	}
+        if err != nil {
+            logErrorfAndExit("Failed to create archive: %s", err)
+        }
 
-        	stackData, err := stackVersionData(configs.StackID)
-        	if err != nil {
-        		logErrorfAndExit("Failed to get stack version info: %s", err)
-        	}
-        	// This is the first file written, to speed up reading it in subsequent builds
-        	if err = archive.writeData(stackData, stackVersionsPath); err != nil {
-        		logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
-        	}
+        stackData, err := stackVersionData(configs.StackID)
+        if err != nil {
+            logErrorfAndExit("Failed to get stack version info: %s", err)
+        }
+        // This is the first file written, to speed up reading it in subsequent builds
+        if err = archive.writeData(stackData, stackVersionsPath); err != nil {
+            logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
+        }
 
-        	if err := archive.Write(pathToIndicatorPath); err != nil {
-        		logErrorfAndExit("Failed to populate archive: %s", err)
-        	}
+        if err := archive.Write(pathToIndicatorPath); err != nil {
+            logErrorfAndExit("Failed to populate archive: %s", err)
+        }
 
-        	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
-        		logErrorfAndExit("Failed to write archive header: %s", err)
-        	}
+        if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
+            logErrorfAndExit("Failed to write archive header: %s", err)
+        }
 
-        	if err := archive.Close(); err != nil {
-        		logErrorfAndExit("Failed to close archive: %s", err)
-        	}
+        if err := archive.Close(); err != nil {
+            logErrorfAndExit("Failed to close archive: %s", err)
+        }
+
+        log.Donef("Done in %s\n", time.Since(startTime))
 	}
-
-	log.Donef("Done in %s\n", time.Since(startTime))
 
 	// Upload cache archive
 	startTime = time.Now()
