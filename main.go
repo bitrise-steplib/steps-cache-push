@@ -14,6 +14,8 @@ import (
 	"os"
 	"strings"
 	"time"
+	syslog "log"
+	"path/filepath"
 
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/replicon/fast-archiver/falib"
@@ -24,6 +26,20 @@ const (
 	stackVersionsPath = "/tmp/archive_info.json"
 	stepID            = "cache-push"
 )
+
+type MultiLevelLogger struct {
+	logger  *syslog.Logger
+	verbose bool
+}
+
+func (l *MultiLevelLogger) Verbose(v ...interface{}) {
+	if l.verbose {
+		l.logger.Println(v...)
+	}
+}
+func (l *MultiLevelLogger) Warning(v ...interface{}) {
+	l.logger.Println(v...)
+}
 
 func logErrorfAndExit(format string, args ...interface{}) {
 	log.Errorf(format, args...)
@@ -63,10 +79,19 @@ func main() {
         }
 
         archive := falib.NewArchiver(outputFile)
+        archive.BlockSize = uint16(4096)
+		archive.DirScanQueueSize = 128
+		archive.FileReadQueueSize = 128
+		archive.BlockQueueSize = 128
+		archive.ExcludePatterns = filepath.SplitList("")
+		archive.DirReaderCount = 16
+		archive.FileReaderCount = 16
+		archive.Logger = &MultiLevelLogger{syslog.New(os.Stderr, "", 0), false}
+
         for pth := range parseIncludeList(strings.Split(configs.Paths, "\n")) {
+            log.Infof("Adding: %s", pth)
         	archive.AddDir(pth)
         }
-
         err := archive.Run()
         if err != nil {
         	logErrorfAndExit("Fatal error in fast archiver:", err.Error())
