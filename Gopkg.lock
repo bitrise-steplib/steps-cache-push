@@ -35,20 +35,20 @@
   version = "v1.1.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:49565e25e42730301a01f1ff4e09cbc45113f36cd788749a1a7ab37bba70ba6f"
+  name = "github.com/hendych/fast-archiver"
+  packages = ["falib"]
+  pruneopts = "UT"
+  revision = "ee236bdcdd2994e6f3366a6c579c05f6e48f5dfa"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   pruneopts = "UT"
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
-
-[[projects]]
-  digest = "1:77c35be0a83d6c5047e661ab41b5b7d5b8c68b16401dc2a12105dc8925c60cfa"
-  name = "github.com/replicon/fast-archiver"
-  packages = ["falib"]
-  pruneopts = "UT"
-  revision = "9b24e4dcc247161e10eaa4e841554e83fe5ff249"
-  version = "v1.02"
 
 [[projects]]
   digest = "1:6baa565fe16f8657cf93469b2b8a6c61a277827734400d27e44d589547297279"
@@ -86,7 +86,7 @@
     "github.com/bitrise-io/go-utils/fileutil",
     "github.com/bitrise-io/go-utils/log",
     "github.com/bitrise-io/go-utils/pathutil",
-    "github.com/replicon/fast-archiver/falib",
+    "github.com/hendych/fast-archiver/falib",
     "github.com/ryanuber/go-glob",
     "github.com/stretchr/testify/require",
   ]

@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 
 	"github.com/bitrise-io/go-utils/log"
-	"github.com/replicon/fast-archiver/falib"
+	"github.com/hendych/fast-archiver/falib"
 )
 
 const (
@@ -89,7 +89,6 @@ func main() {
 		archive.Logger = &MultiLevelLogger{syslog.New(os.Stderr, "", 0), false}
 
         for pth := range parseIncludeList(strings.Split(configs.Paths, "\n")) {
-            log.Infof("Adding: %s", pth)
         	archive.AddDir(pth)
         }
         err := archive.Run()

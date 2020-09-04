@@ -20,6 +20,7 @@ type block struct {
 	uid       int
 	gid       int
 	mode      os.FileMode
+	modTime   int64
 }
 
 // Archive header: stole ideas from the PNG file header here, but replaced

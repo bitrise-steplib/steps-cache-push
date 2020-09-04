@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 // An io.Reader implementation that also keeps a crc64 as it reads.  Fancy!
@@ -30,6 +31,7 @@ type Unarchiver struct {
 	Logger       Logger
 	IgnorePerms  bool
 	IgnoreOwners bool
+	DryRun       bool
 
 	file io.Reader
 }
@@ -83,6 +85,7 @@ func (u *Unarchiver) Run() error {
 			var uid uint32
 			var gid uint32
 			var mode os.FileMode
+			var modTime uint64
 
 			err = binary.Read(reader, binary.BigEndian, &uid)
 			if err != nil {
@@ -99,14 +102,19 @@ func (u *Unarchiver) Run() error {
 				return err
 			}
 
+            err = binary.Read(reader, binary.BigEndian, &modTime)
+			if err != nil {
+				return err
+			}
+
 			c := make(chan block, 1)
 			fileOutputChan[filePath] = c
 			workInProgress.Add(1)
 			go u.writeFile(c, &workInProgress)
-			c <- block{filePath, 0, nil, blockTypeStartOfFile, int(uid), int(gid), mode}
+			c <- block{filePath, 0, nil, blockTypeStartOfFile, int(uid), int(gid), mode, int64(modTime)}
 		} else if blockType[0] == byte(blockTypeEndOfFile) {
 			c := fileOutputChan[filePath]
-			c <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0}
+			c <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0}
 			close(c)
 			delete(fileOutputChan, filePath)
 		} else if blockType[0] == byte(blockTypeData) {
@@ -123,11 +131,12 @@ func (u *Unarchiver) Run() error {
 			}
 
 			c := fileOutputChan[filePath]
-			c <- block{filePath, blockSize, blockData, blockTypeData, 0, 0, 0}
+			c <- block{filePath, blockSize, blockData, blockTypeData, 0, 0, 0, 0}
 		} else if blockType[0] == byte(blockTypeDirectory) {
 			var uid uint32
 			var gid uint32
 			var mode os.FileMode
+			var modTime uint64
 
 			err = binary.Read(reader, binary.BigEndian, &uid)
 			if err != nil {
@@ -141,14 +150,27 @@ func (u *Unarchiver) Run() error {
 			if err != nil {
 				return err
 			}
+            err = binary.Read(reader, binary.BigEndian, &modTime)
+   			if err != nil {
+   				return err
+   			}
 
 			if u.IgnorePerms {
 				mode = os.ModeDir | 0755
 			}
-			err = os.Mkdir(filePath, mode)
+
+			if u.DryRun {
+				continue
+			}
+
+			err = os.MkdirAll(filePath, mode)
 			if err != nil && !os.IsExist(err) {
 				return err
 			}
+            err = os.Chtimes(filePath, time.Unix(int64(modTime), 0), time.Unix(int64(modTime), 0))
+   			if err != nil {
+   				u.Logger.Warning("Directory chtimes error:", err.Error())
+   			}
 			if !u.IgnoreOwners {
 				err = os.Chown(filePath, int(uid), int(gid))
 				if err != nil {
@@ -177,9 +199,14 @@ func (u *Unarchiver) Run() error {
 func (u *Unarchiver) writeFile(blockSource chan block, workInProgress *sync.WaitGroup) {
 	var file *os.File = nil
 	var bufferedFile *bufio.Writer
+	var modTime time.Time = time.Now()
 	for block := range blockSource {
 		if block.blockType == blockTypeStartOfFile {
 			u.Logger.Verbose(block.filePath)
+
+			if u.DryRun {
+				continue
+			}
 
 			tmp, err := os.Create(block.filePath)
 			if err != nil {
@@ -189,6 +216,7 @@ func (u *Unarchiver) writeFile(blockSource chan block, workInProgress *sync.Wait
 			}
 			file = tmp
 			bufferedFile = bufio.NewWriter(file)
+			modTime = time.Unix(int64(block.modTime), 0)
 
 			if !u.IgnoreOwners {
 				err = file.Chown(block.uid, block.gid)
@@ -205,9 +233,14 @@ func (u *Unarchiver) writeFile(blockSource chan block, workInProgress *sync.Wait
 		} else if file == nil {
 			// do nothing; file couldn't be opened for write
 		} else if block.blockType == blockTypeEndOfFile {
-			bufferedFile.Flush()
+            bufferedFile.Flush()
 			file.Close()
 			file = nil
+
+            err := os.Chtimes(block.filePath, modTime, modTime)
+   			if err != nil {
+   				u.Logger.Warning("Unable to chtimes file error: ", err.Error())
+   			}
 		} else {
 			_, err := bufferedFile.Write(block.buffer[:block.numBytes])
 			if err != nil {

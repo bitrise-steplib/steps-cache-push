@@ -99,8 +99,8 @@ func (a *Archiver) directoryScanner() {
 			continue
 		}
 
-		uid, gid, mode := a.getModeOwnership(directory)
-		a.blockQueue <- block{directoryPath, 0, nil, blockTypeDirectory, uid, gid, mode}
+		uid, gid, mode, modTime := a.getModeOwnership(directory)
+		a.blockQueue <- block{directoryPath, 0, nil, blockTypeDirectory, uid, gid, mode, modTime}
 
 		for fileName := range a.readdirnames(directory) {
 			filePath := filepath.Join(directoryPath, fileName)
@@ -156,8 +156,8 @@ func (a *Archiver) fileReader() {
 		file, err := os.Open(filePath)
 		if err == nil {
 
-			uid, gid, mode := a.getModeOwnership(file)
-			a.blockQueue <- block{filePath, 0, nil, blockTypeStartOfFile, uid, gid, mode}
+			uid, gid, mode, modTime := a.getModeOwnership(file)
+			a.blockQueue <- block{filePath, 0, nil, blockTypeStartOfFile, uid, gid, mode, modTime}
 
 			bufferedFile := bufio.NewReader(file)
 
@@ -171,10 +171,10 @@ func (a *Archiver) fileReader() {
 					break
 				}
 
-				a.blockQueue <- block{filePath, uint16(bytesRead), buffer, blockTypeData, 0, 0, 0}
+				a.blockQueue <- block{filePath, uint16(bytesRead), buffer, blockTypeData, 0, 0, 0, 0}
 			}
 
-			a.blockQueue <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0}
+			a.blockQueue <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0}
 			file.Close()
 		} else {
 			a.Logger.Warning("file open error:", err.Error())
@@ -203,6 +203,9 @@ func (b *block) writeBlock(output io.Writer) error {
 			}
 			if err == nil {
 				err = binary.Write(output, binary.BigEndian, b.mode)
+			}
+            if err == nil {
+				err = binary.Write(output, binary.BigEndian, uint64(b.modTime))
 			}
 		case blockTypeEndOfFile:
 			// Nothing to write aside from the block type
