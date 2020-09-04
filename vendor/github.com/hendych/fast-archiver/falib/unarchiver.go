@@ -8,6 +8,7 @@ import (
 	"hash/crc64"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -111,10 +112,10 @@ func (u *Unarchiver) Run() error {
 			fileOutputChan[filePath] = c
 			workInProgress.Add(1)
 			go u.writeFile(c, &workInProgress)
-			c <- block{filePath, 0, nil, blockTypeStartOfFile, int(uid), int(gid), mode, int64(modTime)}
+			c <- block{filePath, 0, nil, blockTypeStartOfFile, int(uid), int(gid), mode, int64(modTime), ""}
 		} else if blockType[0] == byte(blockTypeEndOfFile) {
 			c := fileOutputChan[filePath]
-			c <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0}
+			c <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0, ""}
 			close(c)
 			delete(fileOutputChan, filePath)
 		} else if blockType[0] == byte(blockTypeData) {
@@ -131,12 +132,13 @@ func (u *Unarchiver) Run() error {
 			}
 
 			c := fileOutputChan[filePath]
-			c <- block{filePath, blockSize, blockData, blockTypeData, 0, 0, 0, 0}
+			c <- block{filePath, blockSize, blockData, blockTypeData, 0, 0, 0, 0, ""}
 		} else if blockType[0] == byte(blockTypeDirectory) {
 			var uid uint32
 			var gid uint32
 			var mode os.FileMode
 			var modTime uint64
+			var linkName uint16
 
 			err = binary.Read(reader, binary.BigEndian, &uid)
 			if err != nil {
@@ -154,6 +156,10 @@ func (u *Unarchiver) Run() error {
    			if err != nil {
    				return err
    			}
+            err = binary.Read(reader, binary.BigEndian, &linkName)
+			if err != nil {
+				return err
+			}
 
 			if u.IgnorePerms {
 				mode = os.ModeDir | 0755
@@ -163,14 +169,44 @@ func (u *Unarchiver) Run() error {
 				continue
 			}
 
-			err = os.MkdirAll(filePath, mode)
-			if err != nil && !os.IsExist(err) {
-				return err
+			if (mode&os.ModeSymlink) != 0 {
+			    // Use symlink
+                bufLink := make([]byte, linkName)
+        		_, err = io.ReadFull(reader, bufLink)
+        		if err != nil {
+        			return err
+        		}
+
+        		linkNamePath := string(bufLink)
+
+                if linkNamePath != "" {
+                    err = os.Symlink(linkNamePath, filePath)
+
+                    if err != nil && !os.IsExist(err) {
+                        u.Logger.Warning("Failed to create symlink for: ", filePath)
+
+                        return err
+                    }
+
+                    // Chtimes for symlink
+                    time := time.Unix(int64(modTime), 0).Format("0601021504.05")
+        			if err := exec.Command("touch", "-ht", time, filePath).Run(); err != nil {
+        				u.Logger.Warning("Failed to touch file(%s), error: %s", filePath, err)
+        			}
+    			}
+			} else {
+			    // Make new directory when mode is not symlink
+                err = os.MkdirAll(filePath, mode)
+    			if err != nil && !os.IsExist(err) {
+    				return err
+    			}
+
+                err = os.Chtimes(filePath, time.Unix(int64(modTime), 0), time.Unix(int64(modTime), 0))
+       			if err != nil {
+       				u.Logger.Warning("Directory chtimes error:", err.Error())
+       			}
 			}
-            err = os.Chtimes(filePath, time.Unix(int64(modTime), 0), time.Unix(int64(modTime), 0))
-   			if err != nil {
-   				u.Logger.Warning("Directory chtimes error:", err.Error())
-   			}
+
 			if !u.IgnoreOwners {
 				err = os.Chown(filePath, int(uid), int(gid))
 				if err != nil {
@@ -208,24 +244,24 @@ func (u *Unarchiver) writeFile(blockSource chan block, workInProgress *sync.Wait
 				continue
 			}
 
-			tmp, err := os.Create(block.filePath)
-			if err != nil {
-				u.Logger.Warning("File create error:", err.Error())
-				file = nil
-				continue
-			}
-			file = tmp
+            tmp, err := os.Create(block.filePath)
+    		if err != nil {
+    			u.Logger.Warning("File create error:", err.Error())
+    			file = nil
+    			continue
+    		}
+            file = tmp
 			bufferedFile = bufio.NewWriter(file)
 			modTime = time.Unix(int64(block.modTime), 0)
 
 			if !u.IgnoreOwners {
-				err = file.Chown(block.uid, block.gid)
+				err := file.Chown(block.uid, block.gid)
 				if err != nil {
 					u.Logger.Warning("Unable to chown file to", block.uid, "/", block.gid, ":", err.Error())
 				}
 			}
 			if !u.IgnorePerms {
-				err = file.Chmod(block.mode)
+				err := file.Chmod(block.mode)
 				if err != nil {
 					u.Logger.Warning("Unable to chmod file to", block.mode, ":", err.Error())
 				}

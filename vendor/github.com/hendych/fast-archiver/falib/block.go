@@ -21,6 +21,7 @@ type block struct {
 	gid       int
 	mode      os.FileMode
 	modTime   int64
+	linkName  string
 }
 
 // Archive header: stole ideas from the PNG file header here, but replaced

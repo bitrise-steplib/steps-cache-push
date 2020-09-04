@@ -7,7 +7,7 @@
   name = "github.com/bitrise-io/go-steputils"
   packages = ["stepconf"]
   pruneopts = "UT"
-  revision = "94490ca44ddb645764676a94988f6fc7e3187383"
+  revision = "6d5afa53c7b85b6135e382105116d245b5997ace"
 
 [[projects]]
   branch = "master"
@@ -24,7 +24,7 @@
     "pointers",
   ]
   pruneopts = "UT"
-  revision = "e212188d99b41373b4ff8b69e7b1f677bc427bde"
+  revision = "0c47c16813a4209321c9d0dba2e75867d6901ff2"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -36,11 +36,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:49565e25e42730301a01f1ff4e09cbc45113f36cd788749a1a7ab37bba70ba6f"
+  digest = "1:68675a99539d2f6cbb5dc0ebd0298acab0085277b6e13447eb49787892c5b2f1"
   name = "github.com/hendych/fast-archiver"
   packages = ["falib"]
   pruneopts = "UT"
-  revision = "ee236bdcdd2994e6f3366a6c579c05f6e48f5dfa"
+  revision = "e0ee7f4422d8ef374678efd8bd00c95ea4ce0853"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -71,11 +71,11 @@
 
 [[projects]]
   branch = "v3"
-  digest = "1:8639671727a344ac01338e004e63774356483aba4a7ad2881f5a8f0ff4affe29"
+  digest = "1:229cb0f6192914f518cc1241ede6d6f1f458b31debfa18bf3a5c9e4f7b01e24b"
   name = "gopkg.in/yaml.v3"
   packages = ["."]
   pruneopts = "UT"
-  revision = "a5ece683394c3b88d90572e44d36c93aea492c2c"
+  revision = "eeeca48fe7764f320e4870d231902bf9c1be2c08"
 
 [solve-meta]
   analyzer-name = "dep"

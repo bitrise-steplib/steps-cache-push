@@ -99,8 +99,8 @@ func (a *Archiver) directoryScanner() {
 			continue
 		}
 
-		uid, gid, mode, modTime := a.getModeOwnership(directory)
-		a.blockQueue <- block{directoryPath, 0, nil, blockTypeDirectory, uid, gid, mode, modTime}
+		uid, gid, mode, modTime := a.getModeOwnership(directoryPath)
+		a.blockQueue <- block{directoryPath, 0, nil, blockTypeDirectory, uid, gid, mode, modTime, ""}
 
 		for fileName := range a.readdirnames(directory) {
 			filePath := filepath.Join(directoryPath, fileName)
@@ -119,11 +119,8 @@ func (a *Archiver) directoryScanner() {
 			}
 
 			fileInfo, err := os.Lstat(filePath)
-			if err != nil {
+            if err != nil {
 				a.Logger.Warning("unable to lstat file", err.Error())
-				continue
-			} else if (fileInfo.Mode() & os.ModeSymlink) != 0 {
-				a.Logger.Warning("skipping symbolic link", filePath)
 				continue
 			}
 
@@ -153,11 +150,23 @@ func (a *Archiver) fileReader() {
 	for filePath := range a.fileReadQueue {
 		a.Logger.Verbose(filePath)
 
+        uid, gid, mode, modTime := a.getModeOwnership(filePath)
+
+        if (mode&os.ModeSymlink) != 0 {
+            link, err := os.Readlink(filePath)
+            if err != nil {
+                a.Logger.Warning("unable to add symlink file: ", filePath)
+            }
+
+            a.blockQueue <- block{filePath, 0, nil, blockTypeDirectory, uid, gid, mode, modTime, link}
+
+            a.workInProgress.Done()
+            continue
+        }
+
 		file, err := os.Open(filePath)
 		if err == nil {
-
-			uid, gid, mode, modTime := a.getModeOwnership(file)
-			a.blockQueue <- block{filePath, 0, nil, blockTypeStartOfFile, uid, gid, mode, modTime}
+			a.blockQueue <- block{filePath, 0, nil, blockTypeStartOfFile, uid, gid, mode, modTime, ""}
 
 			bufferedFile := bufio.NewReader(file)
 
@@ -171,10 +180,10 @@ func (a *Archiver) fileReader() {
 					break
 				}
 
-				a.blockQueue <- block{filePath, uint16(bytesRead), buffer, blockTypeData, 0, 0, 0, 0}
+				a.blockQueue <- block{filePath, uint16(bytesRead), buffer, blockTypeData, 0, 0, 0, 0, ""}
 			}
 
-			a.blockQueue <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0}
+			a.blockQueue <- block{filePath, 0, nil, blockTypeEndOfFile, 0, 0, 0, 0, ""}
 			file.Close()
 		} else {
 			a.Logger.Warning("file open error:", err.Error())
@@ -206,6 +215,13 @@ func (b *block) writeBlock(output io.Writer) error {
 			}
             if err == nil {
 				err = binary.Write(output, binary.BigEndian, uint64(b.modTime))
+			}
+            if err == nil && b.blockType == blockTypeDirectory {
+                linkName := []byte(b.linkName)
+				err = binary.Write(output, binary.BigEndian, uint16(len(linkName)))
+			    if err == nil {
+            		_, err = output.Write(linkName)
+            	}
 			}
 		case blockTypeEndOfFile:
 			// Nothing to write aside from the block type
