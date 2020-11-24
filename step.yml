@@ -169,16 +169,17 @@ inputs:
       value_options:
         - "true"
         - "false"
-  - compress_archive: "false"
+  - compression_algorithm: "false"
     opts:
       title: "Compress cache?"
-      summary: "If Compress cache is set to `true`, then it will upload a compressed archive."
+      summary: "If Compress cache is set, then it will upload a compressed archive using certain compression algorithm."
       description: |-
-        If Compress cache is set to `true`, then it will upload a compressed archive.
+        If Compress cache is set, then it will upload a compressed archive using certain compression algorithm.
       is_required: true
       value_options:
-      - "true"
       - "false"
+      - "lz4"
+      - "gzip"
   - bitrise_cache_include_paths: $BITRISE_CACHE_INCLUDE_PATHS
     opts:
       title: "Cache paths collected by steps"
