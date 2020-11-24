@@ -22,3 +22,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/hendych/fast-archiver"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/pierrec/lz4"

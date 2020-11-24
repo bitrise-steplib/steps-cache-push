@@ -4,7 +4,7 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
+	// "compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,13 +17,14 @@ import (
 
 	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/log"
+	"github.com/pierrec/lz4"
 )
 
 // Archive represents a cache archive.
 type Archive struct {
 	file  *os.File
 	tar   *tar.Writer
-	gzip  *gzip.Writer
+	gzip  *lz4.Writer//*gzip.Writer
 }
 
 // NewArchive creates a instance of Archive.
@@ -34,12 +35,13 @@ func NewArchive(pth string, compress bool) (*Archive, error) {
 	}
 
 	var tarWriter *tar.Writer
-	var gzipWriter *gzip.Writer
+	var gzipWriter *lz4.Writer//*gzip.Writer
 	if compress {
-		gzipWriter, err = gzip.NewWriterLevel(file, gzip.BestCompression)
-		if err != nil {
-			return nil, err
-		}
+		// gzipWriter, err = gzip.NewWriterLevel(file, gzip.BestCompression)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		gzipWriter = lz4.NewWriter(file)
 
 		tarWriter = tar.NewWriter(gzipWriter)
 	} else {

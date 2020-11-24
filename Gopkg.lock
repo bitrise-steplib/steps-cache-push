@@ -43,6 +43,17 @@
   revision = "e0ee7f4422d8ef374678efd8bd00c95ea4ce0853"
 
 [[projects]]
+  digest = "1:5d4e89b52ea1467abc362f480ebba12a1b528217f5b6f617ba6a1203d566571b"
+  name = "github.com/pierrec/lz4"
+  packages = [
+    ".",
+    "internal/xxh32",
+  ]
+  pruneopts = "UT"
+  revision = "0e583d326e0ec6b9c1ad223188dc709af385408e"
+  version = "v2.6.0"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -87,6 +98,7 @@
     "github.com/bitrise-io/go-utils/log",
     "github.com/bitrise-io/go-utils/pathutil",
     "github.com/hendych/fast-archiver/falib",
+    "github.com/pierrec/lz4",
     "github.com/ryanuber/go-glob",
     "github.com/stretchr/testify/require",
   ]

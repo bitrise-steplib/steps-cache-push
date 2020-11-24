@@ -10,8 +10,9 @@
 package main
 
 import (
-	"fmt"
+	// "fmt"
 	"os"
+	"io"
 	"strings"
 	"time"
 	syslog "log"
@@ -19,12 +20,14 @@ import (
 
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/hendych/fast-archiver/falib"
+	"github.com/pierrec/lz4"
 )
 
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	stackVersionsPath = "/tmp/archive_info.json"
 	stepID            = "cache-push"
+	maxConcurrency	  = -1
 )
 
 type MultiLevelLogger struct {
@@ -47,26 +50,27 @@ func logErrorfAndExit(format string, args ...interface{}) {
 }
 
 func main() {
-	stepStartedAt := time.Now()
+	// stepStartedAt := time.Now()
 
-	configs, err := ParseConfig()
-	if err != nil {
-		logErrorfAndExit(err.Error())
-	}
+	// configs, err := ParseConfig()
+	// if err != nil {
+	// 	logErrorfAndExit(err.Error())
+	// }
 
-	configs.Print()
-	fmt.Println()
+	// configs.Print()
+	// fmt.Println()
 
-	log.SetEnableDebugLog(configs.DebugMode)
+	// log.SetEnableDebugLog(configs.DebugMode)
 
     cacheArchivePath := ""
     startTime := time.Now()
 
-	if configs.UseFastArchiver == "true" {
+	// if configs.UseFastArchiver == "true" {
 	    // Use Fast Archiver
 
         log.Infof("Using fast archive... Generating archive")
-        cacheArchivePath = "/tmp/cache-archive.fast-archive"
+		// cacheArchivePath = "/tmp/cache-archive.fast-archive"
+		cacheArchivePath = "cache-archive.fast-archive"
         var outputFile *os.File
         if cacheArchivePath != "" {
         	file, err := os.Create(cacheArchivePath)
@@ -76,7 +80,17 @@ func main() {
         	outputFile = file
         } else {
         	outputFile = os.Stdout
-        }
+		}
+
+		defer outputFile.Close()
+		
+		// lz4Writer := lz4.NewWriter(outputFile)
+		// lz4Writer.Header = lz4.Header{
+		// 	BlockChecksum		: false,
+		// 	// BlockMaxSize		: 256 << 10,
+		// 	CompressionLevel	: 2,
+		// }
+		// lz4Writer.WithConcurrency(0)
 
         archive := falib.NewArchiver(outputFile)
         archive.BlockSize = uint16(4096)
@@ -86,152 +100,188 @@ func main() {
 		archive.ExcludePatterns = filepath.SplitList("")
 		archive.DirReaderCount = 16
 		archive.FileReaderCount = 16
-		archive.Logger = &MultiLevelLogger{syslog.New(os.Stderr, "", 0), false}
+		archive.Logger = &MultiLevelLogger{syslog.New(os.Stderr, "", 0), true}
 
-        for pth := range parseIncludeList(strings.Split(configs.Paths, "\n")) {
+        // for pth := range parseIncludeList(strings.Split(configs.Paths, "\n")) {
+        // 	archive.AddDir(pth)
+		// }
+		for pth := range parseIncludeList(strings.Split("igoat", "\n")) {
         	archive.AddDir(pth)
         }
         err := archive.Run()
         if err != nil {
-        	logErrorfAndExit("Fatal error in fast archiver:", err.Error())
-        }
-        outputFile.Close()
+        	logErrorfAndExit("Fatal error in fast archiver: ", err.Error())
+		}
+
+		if (/*configs.CompressArchive == "true"*/ true) {
+			compressStartTime := time.Now()
+			compressedFilePath := cacheArchivePath + lz4.Extension
+			log.Infof("Compressing file into: ", compressedFilePath)
+
+			in, err := os.Open(cacheArchivePath)
+			if err != nil {
+				logErrorfAndExit("Fatal error in opening file: ", err.Error())
+			}
+			defer in.Close()
+
+			compressedOutputFile, err := os.Create(compressedFilePath)
+			if err != nil {
+				logErrorfAndExit("Error creating output file:", err.Error())
+			}
+			
+			lz4Writer := lz4.NewWriter(compressedOutputFile)
+			lz4Writer.Header = lz4.Header{
+				BlockChecksum		: false,
+				BlockMaxSize		: 256 << 10,
+				CompressionLevel	: 2,
+			}
+			lz4Writer.WithConcurrency(maxConcurrency)
+
+			defer lz4Writer.Close()
+
+			_, err = io.Copy(lz4Writer, in)
+			if err != nil {
+				logErrorfAndExit("Error compressing file:", err.Error())
+			}
+
+			log.Donef("Done compressing file in %s\n", time.Since(compressStartTime))
+		}
 
         log.Donef("Done in %s\n", time.Since(startTime))
-	} else {
-	    // Use Tar Archiver
+	// } else {
+	//     // Use Tar Archiver
 
-        // Cleaning paths
-    	log.Infof("Cleaning paths")
+        // // Cleaning paths
+    	// log.Infof("Cleaning paths")
 
-    	pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
-    	if len(pathToIndicatorPath) == 0 {
-    		log.Warnf("No path to cache, skip caching...")
-    		os.Exit(0)
-    	}
+        // pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
+    	// if len(pathToIndicatorPath) == 0 {
+    	// 	log.Warnf("No path to cache, skip caching...")
+    	// 	os.Exit(0)
+    	// }
 
-    	pathToIndicatorPath, err = normalizeIndicatorByPath(pathToIndicatorPath)
-    	if err != nil {
-    		logErrorfAndExit("Failed to parse include list: %s", err)
-    	}
+    	// pathToIndicatorPath, err := normalizeIndicatorByPath(pathToIndicatorPath)
+    	// if err != nil {
+    	// 	logErrorfAndExit("Failed to parse include list: %s", err)
+    	// }
 
-    	excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
-    	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
-    	if err != nil {
-    		logErrorfAndExit("Failed to parse ignore list: %s", err)
-    	}
+    	// excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
+    	// excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
+    	// if err != nil {
+    	// 	logErrorfAndExit("Failed to parse ignore list: %s", err)
+    	// }
 
-    	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
+    	// pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-    	log.Donef("Done in %s\n", time.Since(startTime))
+    	// log.Donef("Done in %s\n", time.Since(startTime))
 
-    	if len(pathToIndicatorPath) == 0 {
-    		log.Warnf("No path to cache, skip caching...")
-    		os.Exit(0)
-    	}
+    	// if len(pathToIndicatorPath) == 0 {
+    	// 	log.Warnf("No path to cache, skip caching...")
+    	// 	os.Exit(0)
+    	// }
 
-    	// Check previous cache
-    	startTime = time.Now()
+    	// // Check previous cache
+    	// startTime = time.Now()
 
-    	log.Infof("Checking previous cache status")
+    	// log.Infof("Checking previous cache status")
 
-    	prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
-    	if err != nil {
-    		logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
-    	}
+    	// prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
+    	// if err != nil {
+    	// 	logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
+    	// }
 
-    	if prevDescriptor != nil {
-    		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
-    	} else {
-    		log.Printf("No previous cache info found")
-    	}
+    	// if prevDescriptor != nil {
+    	// 	log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
+    	// } else {
+    	// 	log.Printf("No previous cache info found")
+    	// }
 
-    	curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
-    	if err != nil {
-    		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
-    	}
+    	// curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
+    	// if err != nil {
+    	// 	logErrorfAndExit("Failed to create current cache descriptor: %s", err)
+    	// }
 
-    	log.Donef("Done in %s\n", time.Since(startTime))
+    // 	log.Donef("Done in %s\n", time.Since(startTime))
 
-    	// Checking file changes
-    	if prevDescriptor != nil {
-    		startTime = time.Now()
+    // 	// Checking file changes
+    // 	if prevDescriptor != nil {
+    // 		startTime = time.Now()
 
-    		log.Infof("Checking for file changes")
+    // 		log.Infof("Checking for file changes")
 
-    		logDebugPaths := func(paths []string) {
-    			for _, pth := range paths {
-    				log.Debugf("- %s", pth)
-    			}
-    		}
+    // 		logDebugPaths := func(paths []string) {
+    // 			for _, pth := range paths {
+    // 				log.Debugf("- %s", pth)
+    // 			}
+    // 		}
 
-    		result := compare(prevDescriptor, curDescriptor)
+    // 		result := compare(prevDescriptor, curDescriptor)
 
-    		log.Warnf("%d files needs to be removed", len(result.removed))
-    		logDebugPaths(result.removed)
-    		log.Warnf("%d files has changed", len(result.changed))
-    		logDebugPaths(result.changed)
-    		log.Warnf("%d files added", len(result.added))
-    		logDebugPaths(result.added)
-    		log.Debugf("%d ignored files removed", len(result.removedIgnored))
-    		logDebugPaths(result.removedIgnored)
-    		log.Debugf("%d files did not change", len(result.matching))
-    		logDebugPaths(result.matching)
-    		log.Debugf("%d ignored files added", len(result.addedIgnored))
-    		logDebugPaths(result.addedIgnored)
+    // 		log.Warnf("%d files needs to be removed", len(result.removed))
+    // 		logDebugPaths(result.removed)
+    // 		log.Warnf("%d files has changed", len(result.changed))
+    // 		logDebugPaths(result.changed)
+    // 		log.Warnf("%d files added", len(result.added))
+    // 		logDebugPaths(result.added)
+    // 		log.Debugf("%d ignored files removed", len(result.removedIgnored))
+    // 		logDebugPaths(result.removedIgnored)
+    // 		log.Debugf("%d files did not change", len(result.matching))
+    // 		logDebugPaths(result.matching)
+    // 		log.Debugf("%d ignored files added", len(result.addedIgnored))
+    // 		logDebugPaths(result.addedIgnored)
 
-    		if result.hasChanges() {
-    			log.Donef("File changes found in %s\n", time.Since(startTime))
-    		} else {
-    			log.Donef("No files found in %s\n", time.Since(startTime))
-    			log.Printf("Total time: %s", time.Since(stepStartedAt))
-    			os.Exit(0)
-    		}
-    	}
+    // 		if result.hasChanges() {
+    // 			log.Donef("File changes found in %s\n", time.Since(startTime))
+    // 		} else {
+    // 			log.Donef("No files found in %s\n", time.Since(startTime))
+    // 			log.Printf("Total time: %s", time.Since(stepStartedAt))
+    // 			os.Exit(0)
+    // 		}
+    // 	}
 
-    	// Generate cache archive
-    	startTime = time.Now()
+    // 	// Generate cache archive
+    // 	startTime = time.Now()
 
-    	log.Infof("Generating cache archive")
-        cacheArchivePath = "/tmp/cache-archive.tar"
+    	// log.Infof("Generating cache archive")
+        // cacheArchivePath = "/tmp/cache-archive.tar"
 
-        archive, err := NewArchive(cacheArchivePath, configs.CompressArchive == "true")
-        if err != nil {
-            logErrorfAndExit("Failed to create archive: %s", err)
-        }
+        // archive, err := NewArchive(cacheArchivePath, configs.CompressArchive == "true")
+        // if err != nil {
+        //     logErrorfAndExit("Failed to create archive: %s", err)
+        // }
 
-        stackData, err := stackVersionData(configs.StackID)
-        if err != nil {
-            logErrorfAndExit("Failed to get stack version info: %s", err)
-        }
-        // This is the first file written, to speed up reading it in subsequent builds
-        if err = archive.writeData(stackData, stackVersionsPath); err != nil {
-            logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
-        }
+        // stackData, err := stackVersionData(configs.StackID)
+        // if err != nil {
+        //     logErrorfAndExit("Failed to get stack version info: %s", err)
+        // }
+        // // This is the first file written, to speed up reading it in subsequent builds
+        // if err = archive.writeData(stackData, stackVersionsPath); err != nil {
+        //     logErrorfAndExit("Failed to write cache info to archive, error: %s", err)
+        // }
 
-        if err := archive.Write(pathToIndicatorPath); err != nil {
-            logErrorfAndExit("Failed to populate archive: %s", err)
-        }
+        // if err := archive.Write(pathToIndicatorPath); err != nil {
+        //     logErrorfAndExit("Failed to populate archive: %s", err)
+        // }
 
-        if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
-            logErrorfAndExit("Failed to write archive header: %s", err)
-        }
+        // if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
+        //     logErrorfAndExit("Failed to write archive header: %s", err)
+        // }
 
-        if err := archive.Close(); err != nil {
-            logErrorfAndExit("Failed to close archive: %s", err)
-        }
+        // if err := archive.Close(); err != nil {
+        //     logErrorfAndExit("Failed to close archive: %s", err)
+        // }
 
-        log.Donef("Done in %s\n", time.Since(startTime))
-	}
+        // log.Donef("Done in %s\n", time.Since(startTime))
+	// }
 
 	// Upload cache archive
-	startTime = time.Now()
+	// startTime = time.Now()
 
-	log.Infof("Uploading cache archive")
+	// log.Infof("Uploading cache archive")
 
-	if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL); err != nil {
-		logErrorfAndExit("Failed to upload archive: %s", err)
-	}
-	log.Donef("Done in %s\n", time.Since(startTime))
-	log.Donef("Total time: %s", time.Since(stepStartedAt))
+	// if err := uploadArchive(cacheArchivePath, configs.CacheAPIURL); err != nil {
+	// 	logErrorfAndExit("Failed to upload archive: %s", err)
+	// }
+	// log.Donef("Done in %s\n", time.Since(startTime))
+	// log.Donef("Total time: %s", time.Since(stepStartedAt))
 }
