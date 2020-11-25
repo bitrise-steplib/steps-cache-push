@@ -32,7 +32,7 @@ func NewArchive(pth, compressor string) (*Archive, error) {
 	var cw *CompressionWriter
 	var err error
 	if compressor != "false" {
-		cw, file, err = NewCompressionWriter(pth, compressor)
+		cw, file, err = NewCompressionWriter(pth, compressor, 0)
 		if err != nil {
 			return nil, err
 		}

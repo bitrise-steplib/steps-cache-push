@@ -32,7 +32,7 @@ func FastArchiveCompress(cacheArchivePath, compressor string) (int64, error) {
 	}
 	defer in.Close()
 
-	compressionWriter, outputFile, err := NewCompressionWriter(cacheArchivePath, compressor)
+	compressionWriter, outputFile, err := NewCompressionWriter(cacheArchivePath, compressor, maxConcurrency)
 	if err != nil {
 		return 0, fmt.Errorf("Error getting compressor writer: ", err.Error())
 	}
@@ -59,7 +59,7 @@ func FastArchiveCompress(cacheArchivePath, compressor string) (int64, error) {
 	return compressedArchiveSize, nil
 }
 
-func NewCompressionWriter(cacheArchivePath, compressor string) (*CompressionWriter, *os.File, error) {
+func NewCompressionWriter(cacheArchivePath, compressor string, concurrency int) (*CompressionWriter, *os.File, error) {
 	if compressor == "lz4" {
 		compressedOutputFile := createOutputFile(cacheArchivePath, lz4.Extension)
 		lz4Writer := lz4.NewWriter(compressedOutputFile)
@@ -68,14 +68,14 @@ func NewCompressionWriter(cacheArchivePath, compressor string) (*CompressionWrit
 			BlockMaxSize		: 256 << 10,
 			CompressionLevel	: 5,
 		}
-		lz4Writer.WithConcurrency(maxConcurrency)
+		lz4Writer.WithConcurrency(concurrency)
 
 		return &CompressionWriter{
 			writer: lz4Writer,
 			closer: lz4Writer,
 		}, compressedOutputFile, nil
 	} else if compressor == "gzip" {
-		compressedOutputFile := createOutputFile(cacheArchivePath, "gz")
+		compressedOutputFile := createOutputFile(cacheArchivePath, ".gz")
 		gzipWriter, err := gzip.NewWriterLevel(compressedOutputFile, gzip.BestCompression)
 		if err != nil {
 			return nil, compressedOutputFile, err
