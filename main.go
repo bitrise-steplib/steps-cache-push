@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 	syslog "log"
-	"path/filepath"
+	// "path/filepath"
 
 	"github.com/bitrise-io/go-utils/log"
-	"github.com/hendych/fast-archiver/falib"
+	// "github.com/hendych/fast-archiver/falib"
 	// "github.com/pierrec/lz4"
 )
 
@@ -123,56 +123,57 @@ func main() {
 	    // Use Tar Archiver
 
         // Cleaning paths
-    	// log.Infof("Cleaning paths")
+    	log.Infof("Cleaning paths")
 
-		// // pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
-		// pathToIndicatorPath := parseIncludeList(strings.Split("igoat", "\n"))
-    	// if len(pathToIndicatorPath) == 0 {
-    	// 	log.Warnf("No path to cache, skip caching...")
-    	// 	os.Exit(0)
-    	// }
+		// pathToIndicatorPath := parseIncludeList(strings.Split(configs.Paths, "\n"))
+		pathToIndicatorPath := parseIncludeList(strings.Split("igoat", "\n"))
+    	if len(pathToIndicatorPath) == 0 {
+    		log.Warnf("No path to cache, skip caching...")
+    		os.Exit(0)
+    	}
 
-    	// pathToIndicatorPath, err := normalizeIndicatorByPath(pathToIndicatorPath)
-    	// if err != nil {
-    	// 	logErrorfAndExit("Failed to parse include list: %s", err)
-    	// }
+    	pathToIndicatorPath, err := normalizeIndicatorByPath(pathToIndicatorPath)
+    	if err != nil {
+    		logErrorfAndExit("Failed to parse include list: %s", err)
+    	}
 
-		// // excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
-		// excludeByPattern := parseIgnoreList(strings.Split("", "\n"))
-    	// excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
-    	// if err != nil {
-    	// 	logErrorfAndExit("Failed to parse ignore list: %s", err)
-    	// }
+		// excludeByPattern := parseIgnoreList(strings.Split(configs.IgnoredPaths, "\n"))
+		excludeByPattern := parseIgnoreList(strings.Split("", "\n"))
+    	excludeByPattern, err = normalizeExcludeByPattern(excludeByPattern)
+    	if err != nil {
+    		logErrorfAndExit("Failed to parse ignore list: %s", err)
+    	}
 
-    	// pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
+    	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-    	// log.Donef("Done in %s\n", time.Since(startTime))
+    	log.Donef("Done in %s\n", time.Since(startTime))
 
-    	// if len(pathToIndicatorPath) == 0 {
-    	// 	log.Warnf("No path to cache, skip caching...")
-    	// 	os.Exit(0)
-    	// }
+    	if len(pathToIndicatorPath) == 0 {
+    		log.Warnf("No path to cache, skip caching...")
+    		os.Exit(0)
+    	}
 
-    	// // Check previous cache
-    	// startTime = time.Now()
+    	// Check previous cache
+    	startTime = time.Now()
 
-    	// log.Infof("Checking previous cache status")
+    	log.Infof("Checking previous cache status")
 
-    	// prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
-    	// if err != nil {
-    	// 	logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
-    	// }
+    	prevDescriptor, err := readCacheDescriptor(cacheInfoFilePath)
+    	if err != nil {
+    		logErrorfAndExit("Failed to read previous cache descriptor: %s", err)
+    	}
 
-    	// if prevDescriptor != nil {
-    	// 	log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
-    	// } else {
-    	// 	log.Printf("No previous cache info found")
-    	// }
+    	if prevDescriptor != nil {
+    		log.Printf("Previous cache info found at: %s", cacheInfoFilePath)
+    	} else {
+    		log.Printf("No previous cache info found")
+    	}
 
-    	// curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
-    	// if err != nil {
-    	// 	logErrorfAndExit("Failed to create current cache descriptor: %s", err)
-    	// }
+		// curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator(configs.FingerprintMethodID))
+		curDescriptor, err := cacheDescriptor(pathToIndicatorPath, ChangeIndicator("12345"))
+    	if err != nil {
+    		logErrorfAndExit("Failed to create current cache descriptor: %s", err)
+    	}
 
     	// log.Donef("Check previous cache done in %s\n", time.Since(startTime))
 
@@ -225,7 +226,8 @@ func main() {
             logErrorfAndExit("Failed to create archive: %s", err)
         }
 
-        stackData, err := stackVersionData(configs.StackID)
+		// stackData, err := stackVersionData(configs.StackID)
+		stackData, err := stackVersionData("1234")
         if err != nil {
             logErrorfAndExit("Failed to get stack version info: %s", err)
         }
@@ -247,7 +249,7 @@ func main() {
         }
 
         log.Donef("Done in %s\n", time.Since(startTime))
-	}
+	// }
 
 	// Upload cache archive
 	// startTime = time.Now()

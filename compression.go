@@ -1,9 +1,7 @@
 package main
 
 import (
-	// "archive/tar"
-	// "bytes"
-	// "compress/gzip"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +32,7 @@ func FastArchiveCompress(cacheArchivePath, compressor string) (int64, error) {
 	}
 	defer in.Close()
 
-	compressionWriter, outputFile, err := getFastArchiveCompressionWriter(cacheArchivePath, compressor)
+	compressionWriter, outputFile, err := NewCompressionWriter(cacheArchivePath, compressor)
 	if err != nil {
 		return 0, fmt.Errorf("Error getting compressor writer: ", err.Error())
 	}
@@ -61,16 +59,9 @@ func FastArchiveCompress(cacheArchivePath, compressor string) (int64, error) {
 	return compressedArchiveSize, nil
 }
 
-func getFastArchiveCompressionWriter(cacheArchivePath, compressor string) (*CompressionWriter, *os.File, error) {
+func NewCompressionWriter(cacheArchivePath, compressor string) (*CompressionWriter, *os.File, error) {
 	if compressor == "lz4" {
-		compressedFilePath := cacheArchivePath + lz4.Extension
-		compressedOutputFile, err := os.Create(compressedFilePath)
-		if err != nil {
-			return nil, compressedOutputFile, fmt.Errorf("Error creating compression output file:", err.Error())
-		}
-
-		log.Infof("Compressing file into: ", compressedFilePath)
-
+		compressedOutputFile := createOutputFile(cacheArchivePath, lz4.Extension)
 		lz4Writer := lz4.NewWriter(compressedOutputFile)
 		lz4Writer.Header = lz4.Header{
 			BlockChecksum		: true,
@@ -83,10 +74,37 @@ func getFastArchiveCompressionWriter(cacheArchivePath, compressor string) (*Comp
 			writer: lz4Writer,
 			closer: lz4Writer,
 		}, compressedOutputFile, nil
-	} 
+	} else if compressor == "gzip" {
+		compressedOutputFile := createOutputFile(cacheArchivePath, "gz")
+		gzipWriter, err := gzip.NewWriterLevel(compressedOutputFile, gzip.BestCompression)
+		if err != nil {
+			return nil, compressedOutputFile, err
+		}
+
+		return  &CompressionWriter{
+			writer: gzipWriter,
+			closer: gzipWriter,
+		}, compressedOutputFile, nil
+	}
 	
 	log.Errorf("Unsupported compressor algorithm in fast-archiver for: ", compressor)
 	os.Exit(1)
 
 	return nil, nil, nil
+}
+
+func createOutputFile(cacheArchivePath, extension string) (*os.File) {
+	compressedFilePath := cacheArchivePath + extension
+	compressedOutputFile, err := os.Create(compressedFilePath)
+
+	log.Infof("Compressing file into: ", compressedFilePath)
+
+	if err != nil {
+		log.Errorf("Error when creating new compressed file", err.Error())
+		os.Exit(1)
+
+		return nil
+	}
+
+	return compressedOutputFile
 }
