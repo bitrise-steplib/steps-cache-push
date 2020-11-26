@@ -35,6 +35,14 @@
   version = "v1.1.1"
 
 [[projects]]
+  digest = "1:2ae2b0560c93701ad73110945612e2fba7db8fab9392fbc90f884330c92ef0d1"
+  name = "github.com/djherbis/atime"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8e47e0e01d08df8b9f840d74299c8ab70a024a30"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -78,6 +86,7 @@
     "github.com/bitrise-io/go-utils/fileutil",
     "github.com/bitrise-io/go-utils/log",
     "github.com/bitrise-io/go-utils/pathutil",
+    "github.com/djherbis/atime",
     "github.com/ryanuber/go-glob",
     "github.com/stretchr/testify/require",
   ]

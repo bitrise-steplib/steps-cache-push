@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"strconv"
 	"time"
 
 	"github.com/bitrise-io/go-utils/fileutil"
@@ -9,11 +11,17 @@ import (
 	"github.com/djherbis/atime"
 )
 
+const (
+	cachePullEndTimePath       = "/tmp/cache_pull_end_time"
+	maxAge               int64 = 7 * 24 * 60 * 60 * 1000
+)
+
 // Meta ...
 type Meta struct {
 	AccessTime int64
 }
 
+// TODO don't we need `json` attributes?
 // CacheMeta ...
 type CacheMeta map[string]Meta
 
@@ -42,12 +50,23 @@ func parseCacheMeta(b []byte) (CacheMeta, error) {
 	return descriptor, nil
 }
 
-func generateCacheMeta(pathToIndicatorPath map[string]string) (CacheMeta, error) {
-
-	for _ := range pathToIndicatorPath {
-
+func readCachePullEndTime() (int64, error) {
+	if exists, err := pathutil.IsPathExists(cachePullEndTimePath); err != nil {
+		return 0, err
+	} else if !exists {
+		return 0, errors.New("end of pull time was not found")
 	}
-	return nil, nil
+
+	ts, err := fileutil.ReadStringFromFile(cachePullEndTimePath)
+	if err != nil {
+		return 0, err
+	}
+	t, err := strconv.ParseInt(ts, 10, 64)
+
+	if err != nil {
+		return 0, err
+	}
+	return t, nil
 }
 
 // read previous meta
@@ -57,45 +76,54 @@ func generateCacheMeta(pathToIndicatorPath map[string]string) (CacheMeta, error)
 // accessed file -> update access time in the new meta
 // 				 -> access time did not change
 //						-> remove if outdated
-
-func processCacheMeta(cacheMetaPath string, cachePullEndTime int64, pathToIndicatorPath map[string]string, maxAge int64) (CacheMeta, error) {
+func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
 	oldCacheMeta, err := readCacheMeta(cacheMetaPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if oldCacheMeta == nil {
 
+	cachePullEndTime, err := readCachePullEndTime()
+	// TODO if we can't read do we stop?
+	if err != nil {
+		return nil, nil, err
 	}
 
 	newCacheMeta := CacheMeta{}
-	for path := range pathToIndicatorPath {
+	newPathToIndicatorPath := map[string]string{}
+	for path := range oldPathToIndicatorPath {
 		t, err := atime.Stat(path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		at := timeToEpoch(t)
 
-		// cleanup outdated cache entries
-		at := t.UnixNano() / int64(time.Millisecond)
-
-		if at <= cachePullEndTime { // was not access during build
-			curr := time.Now().UnixNano() / int64(time.Millisecond)
-
-			if at+maxAge < curr {
-				// delete outdated cache entry
-				delete(pathToIndicatorPath, path)
-				continue
-			}
-
-			if oldCacheMeta == nil {
-				newCacheMeta[path] = Meta{AccessTime: at}
+		if at > cachePullEndTime {
+			// we touched this file now so we update its access timestamp in the meta
+			newCacheMeta[path] = createMeta(at)
+		} else {
+			if m, ok := oldCacheMeta[path]; ok {
+				if m.AccessTime+maxAge < timeToEpoch(time.Now()) {
+					// this file was not touched and it expired in the meta
+					continue
+				} else {
+					// this file was not touched but hasn't expired so we keep its original access time
+					newCacheMeta[path] = createMeta(m.AccessTime)
+				}
 			} else {
-				oldAccessTime := oldCacheMeta[path]
-				newCacheMeta[path] = oldAccessTime
+				// this file was in cache but was not in meta and we not touched it in this workflow
+				// TODO decide whether we add or delete here
+				newCacheMeta[path] = createMeta(at)
 			}
-			continue
 		}
-
-		newCacheMeta[path] = Meta{AccessTime: at}
+		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 	}
+	return newCacheMeta, newPathToIndicatorPath, nil
+}
 
+func createMeta(at int64) Meta {
+	return Meta{at}
+}
+
+func timeToEpoch(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond)
 }
