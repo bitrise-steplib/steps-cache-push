@@ -9,7 +9,6 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
-	"github.com/bitrise-io/xcode-project/pretty"
 	"github.com/djherbis/atime"
 )
 
@@ -142,6 +141,12 @@ func NewCacheMetaGenerator() CacheMetaGenerator {
 	}
 }
 
+func logIf(pth string, format string, args ...interface{}) {
+	if pth == "/root/.gradle/caches/6.1.1/executionHistory/executionHistory.bin" {
+		log.Warnf(format, args...)
+	}
+}
+
 func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
 	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
 	if err != nil {
@@ -166,7 +171,6 @@ func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 	}
 
 	fmt.Printf("Pull end time: %d\n", cachePullEndTime)
-	fmt.Printf("Old cache meta: %s\n", pretty.Object(oldCacheMeta))
 
 	newCacheMeta := CacheMeta{}
 	newPathToIndicatorPath := map[string]string{}
@@ -177,26 +181,29 @@ func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 		}
 
 		if at > cachePullEndTime {
+			logIf(path, "we touched this file now so we update its access timestamp in the meta")
 			// we touched this file now so we update its access timestamp in the meta
 			newCacheMeta[path] = createMeta(at)
 		} else {
 			if m, ok := oldCacheMeta[path]; ok {
 				if m.AccessTime+maxAge < g.timeProvider.now() {
+					logIf(path, "this file was not touched and it expired in the meta")
 					// this file was not touched and it expired in the meta
 					log.Errorf("file expired: %s", path)
 					continue
 				} else {
+					logIf(path, "this file was not touched but hasn't expired so we keep its original access time")
 					// this file was not touched but hasn't expired so we keep its original access time
 					newCacheMeta[path] = m
 				}
 			} else {
+				logIf(path, "this file was in cache but was not in meta and we not touched it in this workflow")
 				// this file was in cache but was not in meta and we not touched it in this workflow
 				newCacheMeta[path] = createMeta(at)
 			}
 		}
 		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 	}
-	fmt.Printf("New cache meta: %s\n", pretty.Object(newCacheMeta))
 	return newCacheMeta, newPathToIndicatorPath, nil
 }
 
