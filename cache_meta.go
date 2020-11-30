@@ -176,6 +176,7 @@ func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 	newPathToIndicatorPath := map[string]string{}
 	for path := range oldPathToIndicatorPath {
 		at, err := g.accessTimeProvider.accessTime(path)
+		logIf(path, fmt.Sprintf("found file, access time: %d", at))
 		if err != nil {
 			return nil, nil, err
 		}

@@ -33,6 +33,7 @@ func logErrorfAndExit(format string, args ...interface{}) {
 
 func main() {
 	stepStartedAt := time.Now()
+	fmt.Printf("Step started at %d\n", stepStartedAt.UnixNano() / int64(time.Millisecond))
 
 	configs, err := ParseConfig()
 	if err != nil {
