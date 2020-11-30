@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -18,19 +18,26 @@ const (
 
 // Meta ...
 type Meta struct {
-	AccessTime int64
+	AccessTime int64 `json:"access_time"`
 }
 
-// TODO don't we need `json` attributes?
 // CacheMeta ...
 type CacheMeta map[string]Meta
+
+type fileNotFoundError struct {
+	filepath string
+}
+
+func (f fileNotFoundError) Error() string {
+	return fmt.Sprintf("%s path was not found", f.filepath)
+}
 
 // readCacheMeta reads cache descriptor from pth is exists.
 func readCacheMeta(pth string) (CacheMeta, error) {
 	if exists, err := pathutil.IsPathExists(pth); err != nil {
 		return nil, err
 	} else if !exists {
-		return nil, nil
+		return nil, fileNotFoundError{filepath: pth}
 	}
 
 	b, err := fileutil.ReadBytesFromFile(pth)
@@ -54,7 +61,7 @@ func readCachePullEndTime() (int64, error) {
 	if exists, err := pathutil.IsPathExists(cachePullEndTimePath); err != nil {
 		return 0, err
 	} else if !exists {
-		return 0, errors.New("end of pull time was not found")
+		return 0, fileNotFoundError{filepath: cachePullEndTimePath}
 	}
 
 	ts, err := fileutil.ReadStringFromFile(cachePullEndTimePath)
@@ -79,13 +86,22 @@ func readCachePullEndTime() (int64, error) {
 func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
 	oldCacheMeta, err := readCacheMeta(cacheMetaPath)
 	if err != nil {
-		return nil, nil, err
+		switch err.(type) {
+		case *fileNotFoundError:
+			return nil, oldPathToIndicatorPath, nil
+		default:
+			return nil, nil, err
+		}
 	}
 
 	cachePullEndTime, err := readCachePullEndTime()
-	// TODO if we can't read do we stop?
 	if err != nil {
-		return nil, nil, err
+		switch err.(type) {
+		case *fileNotFoundError:
+			return nil, oldPathToIndicatorPath, nil
+		default:
+			return nil, nil, err
+		}
 	}
 
 	newCacheMeta := CacheMeta{}
@@ -107,11 +123,10 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 					continue
 				} else {
 					// this file was not touched but hasn't expired so we keep its original access time
-					newCacheMeta[path] = createMeta(m.AccessTime)
+					newCacheMeta[path] = m
 				}
 			} else {
 				// this file was in cache but was not in meta and we not touched it in this workflow
-				// TODO decide whether we add or delete here
 				newCacheMeta[path] = createMeta(at)
 			}
 		}
