@@ -21,7 +21,6 @@ import (
 const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
-	cacheMetaPath     = "/tmp/cache-meta.json"
 	stackVersionsPath = "/tmp/archive_info.json"
 )
 
@@ -69,8 +68,7 @@ func main() {
 
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-	cacheMeta, pathToIndicatorPath, err := generateCacheMeta(cacheMetaPath, pathToIndicatorPath)
-
+	cacheMeta, pathToIndicatorPath, err := NewCacheMetaGenerator().generateCacheMeta(pathToIndicatorPath)
 	if err != nil {
 		logErrorfAndExit("Failed to generate cache meta: %s", err)
 	}

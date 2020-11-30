@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	cacheMetaPath              = "/tmp/cache-meta.json"
 	cachePullEndTimePath       = "/tmp/cache_pull_end_time"
 	maxAge               int64 = 7 * 24 * 60 * 60 * 1000
 )
@@ -77,15 +78,71 @@ func readCachePullEndTime() (int64, error) {
 	return t, nil
 }
 
-// read previous meta
-// if nil -> done
-// else
-// previous meta + timestamp + pathToIndicatorPath -> accessed file
-// accessed file -> update access time in the new meta
-// 				 -> access time did not change
-//						-> remove if outdated
-func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
-	oldCacheMeta, err := readCacheMeta(cacheMetaPath)
+type cacheMetaReader interface {
+	readCacheMeta(pth string) (CacheMeta, error)
+}
+
+type defaultCacheMetaReader struct{}
+
+func (r defaultCacheMetaReader) readCacheMeta(pth string) (CacheMeta, error) {
+	return readCacheMeta(pth)
+}
+
+type cachePullEndTimeReader interface {
+	readCachePullEndTime() (int64, error)
+}
+
+type defaultCachePullEndTimeReader struct{}
+
+func (r defaultCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
+	return readCachePullEndTime()
+}
+
+type accessTimeProvider interface {
+	accessTime(pth string) (int64, error)
+}
+
+type defaultAccessTimeProvider struct{}
+
+func (p defaultAccessTimeProvider) accessTime(pth string) (int64, error) {
+	t, err := atime.Stat(pth)
+	if err != nil {
+		return 0, err
+	}
+	return timeToEpoch(t), nil
+}
+
+type timeProvider interface {
+	now() int64
+}
+
+type defaultTimeProvider struct{}
+
+func (p defaultTimeProvider) now() int64 {
+	t := time.Now()
+	return timeToEpoch(t)
+}
+
+// CacheMetaGenerator ...
+type CacheMetaGenerator struct {
+	cacheMetaReader        cacheMetaReader
+	cachePullEndTimeReader cachePullEndTimeReader
+	accessTimeProvider     accessTimeProvider
+	timeProvider           timeProvider
+}
+
+// NewCacheMetaGenerator ...
+func NewCacheMetaGenerator() CacheMetaGenerator {
+	return CacheMetaGenerator{
+		cacheMetaReader:        defaultCacheMetaReader{},
+		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
+		accessTimeProvider:     defaultAccessTimeProvider{},
+		timeProvider:           defaultTimeProvider{},
+	}
+}
+
+func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
+	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
 	if err != nil {
 		switch err.(type) {
 		case fileNotFoundError:
@@ -96,7 +153,7 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 		}
 	}
 
-	cachePullEndTime, err := readCachePullEndTime()
+	cachePullEndTime, err := g.cachePullEndTimeReader.readCachePullEndTime()
 	if err != nil {
 		switch err.(type) {
 		case fileNotFoundError:
@@ -113,18 +170,17 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 	newCacheMeta := CacheMeta{}
 	newPathToIndicatorPath := map[string]string{}
 	for path := range oldPathToIndicatorPath {
-		t, err := atime.Stat(path)
+		at, err := g.accessTimeProvider.accessTime(path)
 		if err != nil {
 			return nil, nil, err
 		}
-		at := timeToEpoch(t)
 
 		if at > cachePullEndTime {
 			// we touched this file now so we update its access timestamp in the meta
 			newCacheMeta[path] = createMeta(at)
 		} else {
 			if m, ok := oldCacheMeta[path]; ok {
-				if m.AccessTime+maxAge < timeToEpoch(time.Now()) {
+				if m.AccessTime+maxAge < g.timeProvider.now() {
 					// this file was not touched and it expired in the meta
 					continue
 				} else {
