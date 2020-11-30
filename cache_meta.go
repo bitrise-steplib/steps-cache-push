@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bitrise-io/go-utils/fileutil"
+	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/bitrise-io/xcode-project/pretty"
 	"github.com/djherbis/atime"
@@ -182,6 +183,7 @@ func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 			if m, ok := oldCacheMeta[path]; ok {
 				if m.AccessTime+maxAge < g.timeProvider.now() {
 					// this file was not touched and it expired in the meta
+					log.Errorf("file expired: %s", path)
 					continue
 				} else {
 					// this file was not touched but hasn't expired so we keep its original access time
