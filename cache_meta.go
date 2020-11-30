@@ -8,6 +8,7 @@ import (
 
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/pathutil"
+	"github.com/bitrise-io/xcode-project/pretty"
 	"github.com/djherbis/atime"
 )
 
@@ -88,6 +89,7 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 	if err != nil {
 		switch err.(type) {
 		case *fileNotFoundError:
+			fmt.Printf("Cache meta file was not found at %s\n", cacheMetaPath)
 			return nil, oldPathToIndicatorPath, nil
 		default:
 			return nil, nil, err
@@ -98,11 +100,15 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 	if err != nil {
 		switch err.(type) {
 		case *fileNotFoundError:
+			fmt.Printf("Cache Pull endtime file was not found at %s\n", cachePullEndTimePath)
 			return nil, oldPathToIndicatorPath, nil
 		default:
 			return nil, nil, err
 		}
 	}
+
+	fmt.Printf("Pull end time: %d\n", cachePullEndTime)
+	fmt.Printf("Old cache meta: %s\n", pretty.Object(oldCacheMeta))
 
 	newCacheMeta := CacheMeta{}
 	newPathToIndicatorPath := map[string]string{}
@@ -132,6 +138,7 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 		}
 		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 	}
+	fmt.Printf("New cache meta: %s\n", pretty.Object(newCacheMeta))
 	return newCacheMeta, newPathToIndicatorPath, nil
 }
 
