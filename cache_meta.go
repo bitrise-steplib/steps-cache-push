@@ -88,7 +88,7 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 	oldCacheMeta, err := readCacheMeta(cacheMetaPath)
 	if err != nil {
 		switch err.(type) {
-		case *fileNotFoundError:
+		case fileNotFoundError:
 			fmt.Printf("Cache meta file was not found at %s\n", cacheMetaPath)
 			return nil, oldPathToIndicatorPath, nil
 		default:
@@ -99,7 +99,7 @@ func generateCacheMeta(cacheMetaPath string, oldPathToIndicatorPath map[string]s
 	cachePullEndTime, err := readCachePullEndTime()
 	if err != nil {
 		switch err.(type) {
-		case *fileNotFoundError:
+		case fileNotFoundError:
 			fmt.Printf("Cache Pull endtime file was not found at %s\n", cachePullEndTimePath)
 			return nil, oldPathToIndicatorPath, nil
 		default:
