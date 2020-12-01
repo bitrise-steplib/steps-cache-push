@@ -33,7 +33,6 @@ func logErrorfAndExit(format string, args ...interface{}) {
 
 func main() {
 	stepStartedAt := time.Now()
-	fmt.Printf("Step started at %d\n", stepStartedAt.UnixNano() / int64(time.Millisecond))
 
 	configs, err := ParseConfig()
 	if err != nil {
@@ -69,7 +68,7 @@ func main() {
 
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-	cacheMeta, pathToIndicatorPath, err := NewCacheMetaGenerator().generateCacheMeta(pathToIndicatorPath)
+	cacheMeta, pathToIndicatorPath, err := newCacheMetaGenerator().generateCacheMeta(pathToIndicatorPath)
 	if err != nil {
 		logErrorfAndExit("Failed to generate cache meta: %s", err)
 	}

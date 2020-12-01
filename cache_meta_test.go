@@ -6,41 +6,6 @@ import (
 	"testing"
 )
 
-type mockCacheMetaReader struct {
-	meta CacheMeta
-	err  error
-}
-
-func (r mockCacheMetaReader) readCacheMeta(pth string) (CacheMeta, error) {
-	return r.meta, r.err
-}
-
-type mockCachePullEndTimeReader struct {
-	timeStamp int64
-	err       error
-}
-
-func (r mockCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
-	return r.timeStamp, r.err
-}
-
-type mockAccessTimeProvider struct {
-	aTime int64
-	err   error
-}
-
-func (p mockAccessTimeProvider) accessTime(pth string) (int64, error) {
-	return p.aTime, p.err
-}
-
-type mockTimeProvider struct {
-	currentTime int64
-}
-
-func (p mockTimeProvider) now() int64 {
-	return p.currentTime
-}
-
 func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 	type fields struct {
 		cacheMetaReader        cacheMetaReader
@@ -188,7 +153,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := CacheMetaGenerator{
+			g := cacheMetaGenerator{
 				cacheMetaReader:        tt.fields.cacheMetaReader,
 				cachePullEndTimeReader: tt.fields.cachePullEndTimeReader,
 				accessTimeProvider:     tt.fields.accessTimeProvider,
@@ -196,15 +161,66 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 			}
 			got, got1, err := g.generateCacheMeta(tt.args.oldPathToIndicatorPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CacheMetaGenerator.generateCacheMeta() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cacheMetaGenerator.generateCacheMeta() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.wantCacheMeta) {
-				t.Errorf("CacheMetaGenerator.generateCacheMeta() got = %v, want %v", got, tt.wantCacheMeta)
+				t.Errorf("cacheMetaGenerator.generateCacheMeta() got = %v, want %v", got, tt.wantCacheMeta)
 			}
 			if !reflect.DeepEqual(got1, tt.wantPathToIndicatorPath) {
-				t.Errorf("CacheMetaGenerator.generateCacheMeta() got1 = %v, want %v", got1, tt.wantPathToIndicatorPath)
+				t.Errorf("cacheMetaGenerator.generateCacheMeta() got1 = %v, want %v", got1, tt.wantPathToIndicatorPath)
 			}
 		})
 	}
 }
+
+// region cacheMetaReader
+
+type mockCacheMetaReader struct {
+	meta CacheMeta
+	err  error
+}
+
+func (r mockCacheMetaReader) readCacheMeta(_ string) (CacheMeta, error) {
+	return r.meta, r.err
+}
+
+// endregion
+
+// region cachePullEndTimeReader
+
+type mockCachePullEndTimeReader struct {
+	timeStamp int64
+	err       error
+}
+
+func (r mockCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
+	return r.timeStamp, r.err
+}
+
+// endregion
+
+//region accessTimeProvider
+
+type mockAccessTimeProvider struct {
+	aTime int64
+	err   error
+}
+
+func (p mockAccessTimeProvider) accessTime(_ string) (int64, error) {
+	return p.aTime, p.err
+}
+
+// endregion
+
+// region timeProvider
+
+type mockTimeProvider struct {
+	currentTime int64
+}
+
+func (p mockTimeProvider) now() int64 {
+	return p.currentTime
+}
+
+// endregion

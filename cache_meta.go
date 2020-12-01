@@ -3,13 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
-
 	"github.com/bitrise-io/go-utils/fileutil"
-	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/djherbis/atime"
+	"strconv"
+	"time"
 )
 
 const (
@@ -18,24 +16,89 @@ const (
 	maxAge               int64 = 7 * 24 * 60 * 60 * 1000
 )
 
-// Meta ...
-type Meta struct {
-	AccessTime int64 `json:"access_time"`
+func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
+	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
+	if err != nil {
+		switch err.(type) {
+		case fileNotFoundError:
+			oldCacheMeta = CacheMeta{}
+		default:
+			return nil, nil, err
+		}
+	}
+
+	cachePullEndTime, err := g.cachePullEndTimeReader.readCachePullEndTime()
+	if err != nil {
+		switch err.(type) {
+		case fileNotFoundError:
+			cachePullEndTime = -1
+		default:
+			return nil, nil, err
+		}
+	}
+
+	newCacheMeta := CacheMeta{}
+	newPathToIndicatorPath := map[string]string{}
+	for path := range oldPathToIndicatorPath {
+		at, err := g.accessTimeProvider.accessTime(path)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		fileAccessedSinceLastPull := at > cachePullEndTime
+
+		if fileAccessedSinceLastPull {
+			newCacheMeta[path] = newMeta(at)
+		} else {
+			m, oldMetaExists := oldCacheMeta[path]
+
+			if oldMetaExists {
+				isEntryExpired := m.AccessTime+maxAge < g.timeProvider.now()
+
+				if isEntryExpired {
+					continue
+				} else {
+					newCacheMeta[path] = m
+				}
+			} else {
+				newCacheMeta[path] = newMeta(at)
+			}
+		}
+		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
+	}
+	return newCacheMeta, newPathToIndicatorPath, nil
 }
 
-// CacheMeta ...
-type CacheMeta map[string]Meta
+// region cacheMetaGenerator
 
-type fileNotFoundError struct {
-	filepath string
+type cacheMetaGenerator struct {
+	cacheMetaReader        cacheMetaReader
+	cachePullEndTimeReader cachePullEndTimeReader
+	accessTimeProvider     accessTimeProvider
+	timeProvider           timeProvider
 }
 
-func (f fileNotFoundError) Error() string {
-	return fmt.Sprintf("%s path was not found", f.filepath)
+func newCacheMetaGenerator() cacheMetaGenerator {
+	return cacheMetaGenerator{
+		cacheMetaReader:        defaultCacheMetaReader{},
+		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
+		accessTimeProvider:     defaultAccessTimeProvider{},
+		timeProvider:           defaultTimeProvider{},
+	}
 }
 
-// readCacheMeta reads cache descriptor from pth is exists.
-func readCacheMeta(pth string) (CacheMeta, error) {
+// endregion
+
+// region cacheMetaReader
+
+type cacheMetaReader interface {
+	readCacheMeta(pth string) (CacheMeta, error)
+}
+
+type defaultCacheMetaReader struct{}
+
+// readCacheMeta reads cache descriptor from pth if it exists.
+func (r defaultCacheMetaReader) readCacheMeta(pth string) (CacheMeta, error) {
 	if exists, err := pathutil.IsPathExists(pth); err != nil {
 		return nil, err
 	} else if !exists {
@@ -47,16 +110,26 @@ func readCacheMeta(pth string) (CacheMeta, error) {
 		return nil, err
 	}
 
-	return parseCacheMeta(b)
-}
-
-func parseCacheMeta(b []byte) (CacheMeta, error) {
 	var descriptor CacheMeta
 	if err := json.Unmarshal(b, &descriptor); err != nil {
 		return nil, err
 	}
 
 	return descriptor, nil
+}
+
+// endregion
+
+// region cachePullEndTimeReader
+
+type cachePullEndTimeReader interface {
+	readCachePullEndTime() (int64, error)
+}
+
+type defaultCachePullEndTimeReader struct{}
+
+func (r defaultCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
+	return readCachePullEndTime()
 }
 
 func readCachePullEndTime() (int64, error) {
@@ -78,25 +151,9 @@ func readCachePullEndTime() (int64, error) {
 	return t, nil
 }
 
-type cacheMetaReader interface {
-	readCacheMeta(pth string) (CacheMeta, error)
-}
+// endregion
 
-type defaultCacheMetaReader struct{}
-
-func (r defaultCacheMetaReader) readCacheMeta(pth string) (CacheMeta, error) {
-	return readCacheMeta(pth)
-}
-
-type cachePullEndTimeReader interface {
-	readCachePullEndTime() (int64, error)
-}
-
-type defaultCachePullEndTimeReader struct{}
-
-func (r defaultCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
-	return readCachePullEndTime()
-}
+// region accessTimeProvider
 
 type accessTimeProvider interface {
 	accessTime(pth string) (int64, error)
@@ -112,6 +169,10 @@ func (p defaultAccessTimeProvider) accessTime(pth string) (int64, error) {
 	return timeToEpoch(t), nil
 }
 
+// endregion
+
+// region timeProvider
+
 type timeProvider interface {
 	now() int64
 }
@@ -123,94 +184,35 @@ func (p defaultTimeProvider) now() int64 {
 	return timeToEpoch(t)
 }
 
-// CacheMetaGenerator ...
-type CacheMetaGenerator struct {
-	cacheMetaReader        cacheMetaReader
-	cachePullEndTimeReader cachePullEndTimeReader
-	accessTimeProvider     accessTimeProvider
-	timeProvider           timeProvider
-}
+// endregion
 
-// NewCacheMetaGenerator ...
-func NewCacheMetaGenerator() CacheMetaGenerator {
-	return CacheMetaGenerator{
-		cacheMetaReader:        defaultCacheMetaReader{},
-		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
-		accessTimeProvider:     defaultAccessTimeProvider{},
-		timeProvider:           defaultTimeProvider{},
-	}
-}
+// region CacheMeta
 
-func logIf(pth string, format string, args ...interface{}) {
-	if pth == "/root/.gradle/caches/6.1.1/executionHistory/executionHistory.bin" {
-		log.Warnf(format, args...)
-	}
-}
+// CacheMeta ...
+type CacheMeta map[string]Meta
 
-func (g CacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
-	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
-	if err != nil {
-		switch err.(type) {
-		case fileNotFoundError:
-			fmt.Printf("Cache meta file was not found at %s\n", cacheMetaPath)
-			oldCacheMeta = CacheMeta{}
-		default:
-			return nil, nil, err
-		}
-	}
-
-	cachePullEndTime, err := g.cachePullEndTimeReader.readCachePullEndTime()
-	if err != nil {
-		switch err.(type) {
-		case fileNotFoundError:
-			fmt.Printf("Cache Pull endtime file was not found at %s\n", cachePullEndTimePath)
-			cachePullEndTime = -1
-		default:
-			return nil, nil, err
-		}
-	}
-
-	fmt.Printf("Pull end time: %d\n", cachePullEndTime)
-
-	newCacheMeta := CacheMeta{}
-	newPathToIndicatorPath := map[string]string{}
-	for path := range oldPathToIndicatorPath {
-		at, err := g.accessTimeProvider.accessTime(path)
-		logIf(path, fmt.Sprintf("found file, access time: %d", at))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if at > cachePullEndTime {
-			logIf(path, "we touched this file now so we update its access timestamp in the meta")
-			// we touched this file now so we update its access timestamp in the meta
-			newCacheMeta[path] = createMeta(at)
-		} else {
-			if m, ok := oldCacheMeta[path]; ok {
-				if m.AccessTime+maxAge < g.timeProvider.now() {
-					logIf(path, "this file was not touched and it expired in the meta")
-					// this file was not touched and it expired in the meta
-					log.Errorf("file expired: %s", path)
-					continue
-				} else {
-					logIf(path, "this file was not touched but hasn't expired so we keep its original access time")
-					// this file was not touched but hasn't expired so we keep its original access time
-					newCacheMeta[path] = m
-				}
-			} else {
-				logIf(path, "this file was in cache but was not in meta and we not touched it in this workflow")
-				// this file was in cache but was not in meta and we not touched it in this workflow
-				newCacheMeta[path] = createMeta(at)
-			}
-		}
-		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
-	}
-	return newCacheMeta, newPathToIndicatorPath, nil
-}
-
-func createMeta(at int64) Meta {
+func newMeta(at int64) Meta {
 	return Meta{at}
 }
+
+// Meta ...
+type Meta struct {
+	AccessTime int64 `json:"access_time"`
+}
+
+// endregion
+
+// region fileNotFoundError
+
+type fileNotFoundError struct {
+	filepath string
+}
+
+func (f fileNotFoundError) Error() string {
+	return fmt.Sprintf("%s path was not found", f.filepath)
+}
+
+// endregion
 
 func timeToEpoch(t time.Time) int64 {
 	return t.UnixNano() / int64(time.Millisecond)

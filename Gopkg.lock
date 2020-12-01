@@ -27,14 +27,6 @@
   revision = "e212188d99b41373b4ff8b69e7b1f677bc427bde"
 
 [[projects]]
-  branch = "master"
-  digest = "1:93cd9fb0bce4663e1789e43b4b507808a5810ac4e0793f99f5db78d9e13204f7"
-  name = "github.com/bitrise-io/xcode-project"
-  packages = ["pretty"]
-  pruneopts = "UT"
-  revision = "0a01ee11f77d50c301381743fe6efeb49b9ebb28"
-
-[[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -94,7 +86,6 @@
     "github.com/bitrise-io/go-utils/fileutil",
     "github.com/bitrise-io/go-utils/log",
     "github.com/bitrise-io/go-utils/pathutil",
-    "github.com/bitrise-io/xcode-project/pretty",
     "github.com/djherbis/atime",
     "github.com/ryanuber/go-glob",
     "github.com/stretchr/testify/require",
