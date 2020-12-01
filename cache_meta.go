@@ -16,6 +16,24 @@ const (
 	maxAge               int64 = 7 * 24 * 60 * 60 * 1000
 )
 
+// region cacheMetaGenerator
+
+type cacheMetaGenerator struct {
+	cacheMetaReader        cacheMetaReader
+	cachePullEndTimeReader cachePullEndTimeReader
+	accessTimeProvider     accessTimeProvider
+	timeProvider           timeProvider
+}
+
+func newCacheMetaGenerator() cacheMetaGenerator {
+	return cacheMetaGenerator{
+		cacheMetaReader:        defaultCacheMetaReader{},
+		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
+		accessTimeProvider:     defaultAccessTimeProvider{},
+		timeProvider:           defaultTimeProvider{},
+	}
+}
+
 func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
 	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
 	if err != nil {
@@ -42,7 +60,8 @@ func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 	for path := range oldPathToIndicatorPath {
 		at, err := g.accessTimeProvider.accessTime(path)
 		if err != nil {
-			return nil, nil, err
+			newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
+			continue
 		}
 
 		fileAccessedSinceLastPull := at > cachePullEndTime
@@ -67,24 +86,6 @@ func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 	}
 	return newCacheMeta, newPathToIndicatorPath, nil
-}
-
-// region cacheMetaGenerator
-
-type cacheMetaGenerator struct {
-	cacheMetaReader        cacheMetaReader
-	cachePullEndTimeReader cachePullEndTimeReader
-	accessTimeProvider     accessTimeProvider
-	timeProvider           timeProvider
-}
-
-func newCacheMetaGenerator() cacheMetaGenerator {
-	return cacheMetaGenerator{
-		cacheMetaReader:        defaultCacheMetaReader{},
-		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
-		accessTimeProvider:     defaultAccessTimeProvider{},
-		timeProvider:           defaultTimeProvider{},
-	}
 }
 
 // endregion

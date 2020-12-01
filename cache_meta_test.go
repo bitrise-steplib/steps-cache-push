@@ -6,6 +6,57 @@ import (
 	"testing"
 )
 
+// region cacheMetaReader
+
+type mockCacheMetaReader struct {
+	meta CacheMeta
+	err  error
+}
+
+func (r mockCacheMetaReader) readCacheMeta(_ string) (CacheMeta, error) {
+	return r.meta, r.err
+}
+
+// endregion
+
+// region cachePullEndTimeReader
+
+type mockCachePullEndTimeReader struct {
+	timeStamp int64
+	err       error
+}
+
+func (r mockCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
+	return r.timeStamp, r.err
+}
+
+// endregion
+
+//region accessTimeProvider
+
+type mockAccessTimeProvider struct {
+	aTime int64
+	err   error
+}
+
+func (p mockAccessTimeProvider) accessTime(_ string) (int64, error) {
+	return p.aTime, p.err
+}
+
+// endregion
+
+// region timeProvider
+
+type mockTimeProvider struct {
+	currentTime int64
+}
+
+func (p mockTimeProvider) now() int64 {
+	return p.currentTime
+}
+
+// endregion
+
 func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 	type fields struct {
 		cacheMetaReader        cacheMetaReader
@@ -138,17 +189,18 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "access time provider fails",
+			name: "access time provider error recovers",
 			fields: fields{
-				cacheMetaReader:        mockCacheMetaReader{},
-				cachePullEndTimeReader: mockCachePullEndTimeReader{},
+				cacheMetaReader:        mockCacheMetaReader{meta: CacheMeta{"a": Meta{AccessTime: 1}}},
+				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 3},
 				accessTimeProvider:     mockAccessTimeProvider{err: errors.New("missing permission")},
-				timeProvider:           mockTimeProvider{},
+				timeProvider:           mockTimeProvider{currentTime: 4},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
 			},
-			wantErr: true,
+			wantCacheMeta:           CacheMeta{},
+			wantPathToIndicatorPath: map[string]string{"a": ""},
 		},
 	}
 	for _, tt := range tests {
@@ -173,54 +225,3 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 		})
 	}
 }
-
-// region cacheMetaReader
-
-type mockCacheMetaReader struct {
-	meta CacheMeta
-	err  error
-}
-
-func (r mockCacheMetaReader) readCacheMeta(_ string) (CacheMeta, error) {
-	return r.meta, r.err
-}
-
-// endregion
-
-// region cachePullEndTimeReader
-
-type mockCachePullEndTimeReader struct {
-	timeStamp int64
-	err       error
-}
-
-func (r mockCachePullEndTimeReader) readCachePullEndTime() (int64, error) {
-	return r.timeStamp, r.err
-}
-
-// endregion
-
-//region accessTimeProvider
-
-type mockAccessTimeProvider struct {
-	aTime int64
-	err   error
-}
-
-func (p mockAccessTimeProvider) accessTime(_ string) (int64, error) {
-	return p.aTime, p.err
-}
-
-// endregion
-
-// region timeProvider
-
-type mockTimeProvider struct {
-	currentTime int64
-}
-
-func (p mockTimeProvider) now() int64 {
-	return p.currentTime
-}
-
-// endregion
