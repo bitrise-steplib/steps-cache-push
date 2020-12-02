@@ -6,6 +6,7 @@ import (
 	"github.com/bitrise-io/go-utils/fileutil"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/djherbis/atime"
+	"os"
 	"strconv"
 	"time"
 )
@@ -23,6 +24,7 @@ type cacheMetaGenerator struct {
 	cachePullEndTimeReader cachePullEndTimeReader
 	accessTimeProvider     accessTimeProvider
 	timeProvider           timeProvider
+	fileInfoProvider       fileInfoProvider
 }
 
 func newCacheMetaGenerator() cacheMetaGenerator {
@@ -31,10 +33,11 @@ func newCacheMetaGenerator() cacheMetaGenerator {
 		cachePullEndTimeReader: defaultCachePullEndTimeReader{},
 		accessTimeProvider:     defaultAccessTimeProvider{},
 		timeProvider:           defaultTimeProvider{},
+		fileInfoProvider:       defaultFileInfoProvider{},
 	}
 }
 
-func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
+func (g cacheMetaGenerator) filterOldPathsAndUpdateMeta(oldPathToIndicatorPath map[string]string) (CacheMeta, map[string]string, error) {
 	oldCacheMeta, err := g.cacheMetaReader.readCacheMeta(cacheMetaPath)
 	if err != nil {
 		switch err.(type) {
@@ -58,34 +61,57 @@ func (g cacheMetaGenerator) generateCacheMeta(oldPathToIndicatorPath map[string]
 	newCacheMeta := CacheMeta{}
 	newPathToIndicatorPath := map[string]string{}
 	for path := range oldPathToIndicatorPath {
-		at, err := g.accessTimeProvider.accessTime(path)
-		if err != nil {
+		at, skip := g.getAccessTime(path)
+
+		if skip {
 			newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 			continue
 		}
 
-		fileAccessedSinceLastPull := at > cachePullEndTime
-
-		if fileAccessedSinceLastPull {
-			newCacheMeta[path] = newMeta(at)
-		} else {
-			m, oldMetaExists := oldCacheMeta[path]
-
-			if oldMetaExists {
-				isEntryExpired := m.AccessTime+maxAge < g.timeProvider.now()
-
-				if isEntryExpired {
-					continue
-				} else {
-					newCacheMeta[path] = m
-				}
-			} else {
-				newCacheMeta[path] = newMeta(at)
-			}
+		metaAdded := g.setMeta(at, cachePullEndTime, newCacheMeta, path, oldCacheMeta)
+		if metaAdded {
+			newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 		}
-		newPathToIndicatorPath[path] = oldPathToIndicatorPath[path]
 	}
 	return newCacheMeta, newPathToIndicatorPath, nil
+}
+
+func (g cacheMetaGenerator) getAccessTime(path string) (int64, bool) {
+	info, err := g.fileInfoProvider.lstat(path)
+	if err != nil {
+		return 0, true
+	}
+	isSymlink := info.Mode()&os.ModeSymlink != 0
+	isDir := info.IsDir()
+	if isSymlink || isDir {
+		return 0, true
+	}
+	at, err := g.accessTimeProvider.accessTime(path)
+	if err != nil {
+		return 0, true
+	}
+	return at, false
+}
+
+func (g cacheMetaGenerator) setMeta(at int64, cachePullEndTime int64, newCacheMeta CacheMeta, path string, oldCacheMeta CacheMeta) bool {
+	fileAccessedSinceLastPull := at > cachePullEndTime
+	if fileAccessedSinceLastPull {
+		newCacheMeta[path] = newMeta(at)
+		return true
+	}
+
+	m, oldMetaExists := oldCacheMeta[path]
+	if oldMetaExists {
+		isEntryExpired := m.AccessTime+maxAge < g.timeProvider.now()
+		if isEntryExpired {
+			return false
+		}
+		newCacheMeta[path] = m
+		return true
+	}
+
+	newCacheMeta[path] = newMeta(at)
+	return true
 }
 
 // endregion
@@ -211,6 +237,20 @@ type fileNotFoundError struct {
 
 func (f fileNotFoundError) Error() string {
 	return fmt.Sprintf("%s path was not found", f.filepath)
+}
+
+// endregion
+
+// region fileInfoProvider
+
+type fileInfoProvider interface {
+	lstat(name string) (os.FileInfo, error)
+}
+
+type defaultFileInfoProvider struct{}
+
+func (p defaultFileInfoProvider) lstat(name string) (os.FileInfo, error) {
+	return os.Lstat(name)
 }
 
 // endregion

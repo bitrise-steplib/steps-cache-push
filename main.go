@@ -68,7 +68,7 @@ func main() {
 
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
 
-	cacheMeta, pathToIndicatorPath, err := newCacheMetaGenerator().generateCacheMeta(pathToIndicatorPath)
+	cacheMeta, pathToIndicatorPath, err := newCacheMetaGenerator().filterOldPathsAndUpdateMeta(pathToIndicatorPath)
 	if err != nil {
 		logErrorfAndExit("Failed to generate cache meta: %s", err)
 	}

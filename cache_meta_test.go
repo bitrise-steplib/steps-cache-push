@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // region cacheMetaReader
@@ -57,12 +59,55 @@ func (p mockTimeProvider) now() int64 {
 
 // endregion
 
+// region fileInfoProvider
+
+type mockFileInfoProvider struct {
+	mode  os.FileMode
+	isDir bool
+}
+
+type fakeFileInfo struct {
+	mode  os.FileMode
+	isDir bool
+}
+
+func (f fakeFileInfo) Name() string {
+	panic("implement me")
+}
+
+func (f fakeFileInfo) Size() int64 {
+	panic("implement me")
+}
+
+func (f fakeFileInfo) Mode() os.FileMode {
+	return f.mode
+}
+
+func (f fakeFileInfo) ModTime() time.Time {
+	panic("implement me")
+}
+
+func (f fakeFileInfo) IsDir() bool {
+	return f.isDir
+}
+
+func (f fakeFileInfo) Sys() interface{} {
+	panic("implement me")
+}
+
+func (p mockFileInfoProvider) lstat(_ string) (os.FileInfo, error) {
+	return fakeFileInfo{mode: p.mode, isDir: p.isDir}, nil
+}
+
+// endregion
+
 func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 	type fields struct {
 		cacheMetaReader        cacheMetaReader
 		cachePullEndTimeReader cachePullEndTimeReader
 		accessTimeProvider     accessTimeProvider
 		timeProvider           timeProvider
+		fileInfoProvider       fileInfoProvider
 	}
 	type args struct {
 		oldPathToIndicatorPath map[string]string
@@ -82,6 +127,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 0},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 1},
 				timeProvider:           mockTimeProvider{currentTime: 2},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -96,6 +142,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 2},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 1},
 				timeProvider:           mockTimeProvider{currentTime: 2 + maxAge},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -110,6 +157,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 2},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 2},
 				timeProvider:           mockTimeProvider{currentTime: 3},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -124,6 +172,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 2},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 3},
 				timeProvider:           mockTimeProvider{currentTime: 4},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": "", "b": ""},
@@ -138,6 +187,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 3},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 2},
 				timeProvider:           mockTimeProvider{currentTime: 4},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": "", "b": ""},
@@ -152,6 +202,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 0},
 				accessTimeProvider:     mockAccessTimeProvider{aTime: 1},
 				timeProvider:           mockTimeProvider{currentTime: 2},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -173,6 +224,7 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{err: fileNotFoundError{}},
 				accessTimeProvider:     mockAccessTimeProvider{},
 				timeProvider:           mockTimeProvider{},
+				fileInfoProvider:       mockFileInfoProvider{},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -195,6 +247,37 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 3},
 				accessTimeProvider:     mockAccessTimeProvider{err: errors.New("missing permission")},
 				timeProvider:           mockTimeProvider{currentTime: 4},
+				fileInfoProvider:       mockFileInfoProvider{},
+			},
+			args: args{
+				oldPathToIndicatorPath: map[string]string{"a": ""},
+			},
+			wantCacheMeta:           CacheMeta{},
+			wantPathToIndicatorPath: map[string]string{"a": ""},
+		},
+		{
+			name: "skip access time check on dirs",
+			fields: fields{
+				cacheMetaReader:        mockCacheMetaReader{},
+				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 3},
+				accessTimeProvider:     mockAccessTimeProvider{aTime: 1},
+				timeProvider:           mockTimeProvider{currentTime: 3 + maxAge},
+				fileInfoProvider:       mockFileInfoProvider{isDir: true},
+			},
+			args: args{
+				oldPathToIndicatorPath: map[string]string{"a": ""},
+			},
+			wantCacheMeta:           CacheMeta{},
+			wantPathToIndicatorPath: map[string]string{"a": ""},
+		},
+		{
+			name: "skip access time check on symlinks",
+			fields: fields{
+				cacheMetaReader:        mockCacheMetaReader{},
+				cachePullEndTimeReader: mockCachePullEndTimeReader{timeStamp: 3},
+				accessTimeProvider:     mockAccessTimeProvider{aTime: 1},
+				timeProvider:           mockTimeProvider{currentTime: 3 + maxAge},
+				fileInfoProvider:       mockFileInfoProvider{mode: os.ModeSymlink},
 			},
 			args: args{
 				oldPathToIndicatorPath: map[string]string{"a": ""},
@@ -210,17 +293,18 @@ func TestCacheMetaGenerator_generateCacheMeta(t *testing.T) {
 				cachePullEndTimeReader: tt.fields.cachePullEndTimeReader,
 				accessTimeProvider:     tt.fields.accessTimeProvider,
 				timeProvider:           tt.fields.timeProvider,
+				fileInfoProvider:       tt.fields.fileInfoProvider,
 			}
-			got, got1, err := g.generateCacheMeta(tt.args.oldPathToIndicatorPath)
+			got, got1, err := g.filterOldPathsAndUpdateMeta(tt.args.oldPathToIndicatorPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("cacheMetaGenerator.generateCacheMeta() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cacheMetaGenerator.filterOldPathsAndUpdateMeta() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.wantCacheMeta) {
-				t.Errorf("cacheMetaGenerator.generateCacheMeta() got = %v, want %v", got, tt.wantCacheMeta)
+				t.Errorf("cacheMetaGenerator.filterOldPathsAndUpdateMeta() got = %v, want %v", got, tt.wantCacheMeta)
 			}
 			if !reflect.DeepEqual(got1, tt.wantPathToIndicatorPath) {
-				t.Errorf("cacheMetaGenerator.generateCacheMeta() got1 = %v, want %v", got1, tt.wantPathToIndicatorPath)
+				t.Errorf("cacheMetaGenerator.filterOldPathsAndUpdateMeta() got1 = %v, want %v", got1, tt.wantPathToIndicatorPath)
 			}
 		})
 	}
