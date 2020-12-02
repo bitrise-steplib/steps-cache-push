@@ -22,8 +22,9 @@ const (
 	cacheInfoFilePath = "/tmp/cache-info.json"
 	cacheArchivePath  = "/tmp/cache-archive.tar"
 	stackVersionsPath = "/tmp/archive_info.json"
-	stepID            = "cache-push"
 )
+
+const stepID = "cache-push"
 
 func logErrorfAndExit(format string, args ...interface{}) {
 	log.Errorf(format, args...)
@@ -66,6 +67,11 @@ func main() {
 	}
 
 	pathToIndicatorPath = interleave(pathToIndicatorPath, excludeByPattern)
+
+	cacheMeta, pathToIndicatorPath, err := newCacheMetaGenerator().filterOldPathsAndUpdateMeta(pathToIndicatorPath)
+	if err != nil {
+		logErrorfAndExit("Failed to generate cache meta: %s", err)
+	}
 
 	log.Donef("Done in %s\n", time.Since(startTime))
 
@@ -157,7 +163,11 @@ func main() {
 	}
 
 	if err := archive.WriteHeader(curDescriptor, cacheInfoFilePath); err != nil {
-		logErrorfAndExit("Failed to write archive header: %s", err)
+		logErrorfAndExit("Failed to write archive cache-info header: %s", err)
+	}
+
+	if err := archive.WriteHeader(cacheMeta, cacheMetaPath); err != nil {
+		logErrorfAndExit("Failed to write archive cache-meta header: %s", err)
 	}
 
 	if err := archive.Close(); err != nil {
