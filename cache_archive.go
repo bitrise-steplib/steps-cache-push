@@ -113,14 +113,14 @@ func (a *Archive) writeOne(pth string) error {
 	return nil
 }
 
-// WriteHeader writes the json content into the archive as a tar header.
-func (a *Archive) WriteHeader(jsonContent interface{}, pth string) error {
-	b, err := json.MarshalIndent(jsonContent, "", " ")
+// WriteHeader writes the cache descriptor file into the archive as a tar header.
+func (a *Archive) WriteHeader(descriptor map[string]string, descriptorPth string) error {
+	b, err := json.MarshalIndent(descriptor, "", " ")
 	if err != nil {
 		return err
 	}
 
-	return a.writeData(b, pth)
+	return a.writeData(b, descriptorPth)
 }
 
 // writeData writes the byte array into the archive.
