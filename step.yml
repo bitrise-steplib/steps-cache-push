@@ -61,8 +61,7 @@ deps:
   - name: tar
 run_if: ".IsCI | and (not .IsPR)"
 inputs:
-  - cache_paths: |
-      $BITRISE_CACHE_DIR
+  - cache_paths:
     opts:
       title: "Cache paths"
       summary: Cache these paths. Separate paths with a newline.
