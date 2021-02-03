@@ -34,7 +34,6 @@ workflows:
     envs:
     - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp3
     - CACHE_PATH: |
-        $BITRISE_CACHE_DIR
         ./_sample_artifacts/filestructure -> ./_sample_artifacts/filestructure/build/findme.test
         ./DoesNotExist/
         ./DoesNotExist
@@ -150,7 +149,6 @@ workflows:
         inputs:
         - is_debug_mode: true
         - cache_paths: |
-            $BITRISE_CACHE_DIR
             ../_sample_artifacts/filestructure -> ../_sample_artifacts/filestructure/build/findme.test
             ./DoesNotExist/
             ./DoesNotExist
