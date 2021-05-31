@@ -111,9 +111,9 @@ func main() {
 
 		result := compare(prevDescriptor, curDescriptor)
 
-		log.Warnf("%d files needs to be removed", len(result.removed))
+		log.Warnf("%d files need to be removed", len(result.removed))
 		logDebugPaths(result.removed)
-		log.Warnf("%d files has changed", len(result.changed))
+		log.Warnf("%d files have changed", len(result.changed))
 		logDebugPaths(result.changed)
 		log.Warnf("%d files added", len(result.added))
 		logDebugPaths(result.added)
