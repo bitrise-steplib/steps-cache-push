@@ -124,6 +124,11 @@ workflows:
     envs:
     - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp1
     steps:
+    - change-workdir:
+        title: Switch working dir to $ORIG_BITRISE_SOURCE_DIR
+        inputs:
+        - path: $ORIG_BITRISE_SOURCE_DIR
+        - is_create_path: true
     - script:
         title: Cleanup $TMP_DIR and archive tmp files
         inputs:
