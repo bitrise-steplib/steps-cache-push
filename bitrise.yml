@@ -16,6 +16,7 @@ workflows:
     - ignore_path_test
     - generic_fs_checks
     - test-stack-version
+    - glob_checks
     # - backward_compatibility_test
     steps:
     - go-list:
