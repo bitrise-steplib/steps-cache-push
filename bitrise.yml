@@ -416,16 +416,16 @@ workflows:
         ./DoesNotExist
         ~/DoesNotExist
         ~/.bitrise/plugins/step/*/*.go
-    - TMP_PATH: $ORIG_BITRISE_SOURCE_DIR/_tmp_glob
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_glob
     steps:
     - script:
         title: Cleanup archive tmp files
         inputs:
-        - content: rm -rf "$TMP_PATH" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
     - change-workdir:
-        title: Switch working dir to $TMP_PATH
+        title: Switch working dir to $TMP_DIR
         inputs:
-        - path: $TMP_PATH
+        - path: $TMP_DIR
         - is_create_path: true
     - path::./:
         title: Step Test
@@ -444,28 +444,28 @@ workflows:
             #!/bin/bash
             set -ex
 
-            cd $TMP_PATH
+            cd $TMP_DIR
 
             # extract the archive
             tar -xf /tmp/cache-archive.tar
 
-            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/spec.yml ]; then
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/spec.yml ]; then
               echo "file should exist"
               exit 1
             fi
-            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/analytics/src/bitrise.yml ]; then
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/analytics/src/bitrise.yml ]; then
               echo "file should exist"
               exit 1
             fi
-            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/bitrise-plugin.yml ]; then
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/bitrise-plugin.yml ]; then
               echo "file should exist"
               exit 1
             fi
-            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/main.go ]; then
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/main.go ]; then
               echo "file should exist"
               exit 1
             fi
-            if [ -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/cmd/version.go ]; then
+            if [ -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/cmd/version.go ]; then
               echo "file should not exist"
               exit 1
             fi
