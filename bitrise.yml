@@ -421,7 +421,7 @@ workflows:
     - script:
         title: Cleanup archive tmp files
         inputs:
-        - content: rm -rf $TMP_PATH "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+        - content: rm -rf "$TMP_PATH" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
     - change-workdir:
         title: Switch working dir to $TMP_PATH
         inputs:
