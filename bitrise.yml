@@ -135,7 +135,7 @@ workflows:
     - script:
         title: Download assets
         inputs:
-        - content:  git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
+        - content: git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
     - change-workdir:
         title: Switch working dir to $TMP_DIR/_workdir
         run_if: true
@@ -219,7 +219,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove TMP_DIR to cleanup test_ignorechanges.txt file
             rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
@@ -257,7 +257,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove TMP_DIR to cleanup test_ignorechanges.txt file
             rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
@@ -345,7 +345,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove CACHE_PATH to cleanup
             rm -rf $CACHE_PATH
             mkdir $CACHE_PATH
@@ -404,6 +404,71 @@ workflows:
               exit 1
             fi
 
+  glob_checks:
+    description: |
+      Tests if glob matching works.
+    envs:
+    - CACHE_PATH: |
+        ~/.bitrise/**/*.yml -> ~/.bitrise/plugins/spec.yml
+        ./DoesNotExist/
+        ./DoesNotExist/ -> ./doesnotexist.yml
+        ./DoesNotExist
+        ~/DoesNotExist
+        ~/.bitrise/plugins/step/*/*.go
+    - TMP_PATH: $ORIG_BITRISE_SOURCE_DIR/_tmp_glob
+    steps:
+    - script:
+        title: Cleanup archive tmp files
+        inputs:
+        - content: rm -rf $TMP_PATH "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_PATH
+        inputs:
+        - path: $TMP_PATH
+        - is_create_path: true
+    - path::./:
+        title: Step Test
+        is_always_run: true
+        run_if: true
+        is_skippable: false
+        inputs:
+        - compress_archive: true
+        - is_debug_mode: true
+        - cache_paths: $CACHE_PATH
+    - script:
+        title: Check if stored structure exists
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+
+            cd $TMP_PATH
+
+            # extract the archive
+            tar -xf /tmp/cache-archive.tar
+
+            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/spec.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/analytics/src/bitrise.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/bitrise-plugin.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/main.go ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ -f $TMP_PATH/$HOME/.bitrise/plugins/step/src/cmd/version.go ]; then
+              echo "file should not exist"
+              exit 1
+            fi
+
   test-stack-version:
     description: |
       Test that archive_info.json containing stack ID is created.
@@ -453,23 +518,6 @@ workflows:
               echo "archive_info.json not found as first file in archive"
               exit 1
             fi
-
-  # ----------------------------------------------------------------
-  # --- Utility workflows
-  dep-update:
-    title: Dep update
-    description: |
-      Used for updating bitrise dependencies with dep
-    steps:
-    - script:
-        title: Dependency update
-        inputs:
-        - content: |-
-            #!/bin/bash
-            set -ex
-            go get -u -v github.com/golang/dep/cmd/dep
-            dep ensure -v
-            dep ensure -v -update
 
   # ----------------------------------------------------------------
   # --- workflows to Share this step into a Step Library
