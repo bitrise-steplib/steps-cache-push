@@ -410,13 +410,6 @@ workflows:
           Tests if relative globbing works.
       envs:
       - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_relative_glob
-      - CACHE_PATH: |
-          ~/.bitrise/**/*.yml -> ~/.bitrise/plugins/spec.yml
-          ./DoesNotExist/
-          ./DoesNotExist/ -> ./doesnotexist.yml
-          ./DoesNotExist
-          ~/DoesNotExist
-          ~/.bitrise/plugins/step/*/*.go
       steps:
       - script:
             title: Cleanup $TMP_DIR and archive tmp files
