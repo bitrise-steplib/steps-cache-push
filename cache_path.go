@@ -17,9 +17,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bitrise-io/doublestar/v3"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
-	"github.com/bmatcuk/doublestar/v3"
 	"github.com/ryanuber/go-glob"
 )
 
@@ -149,7 +149,7 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			return nil, err
 		}
 
-		matches, err := doublestar.Glob(pth)
+		matches, err := doublestar.Glob(pth, false)
 		if err != nil {
 			return nil, err
 		}

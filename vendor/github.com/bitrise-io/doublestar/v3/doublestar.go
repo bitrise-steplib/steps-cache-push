@@ -287,12 +287,12 @@ func doMatching(pattern, name string, separator rune) (matched bool, err error) 
 //
 // Note: this is meant as a drop-in replacement for filepath.Glob().
 //
-func Glob(pattern string) (matches []string, err error) {
-	return GlobOS(StandardOS, pattern)
+func Glob(pattern string, followSymlinks bool) (matches []string, err error) {
+	return GlobOS(StandardOS, pattern, followSymlinks)
 }
 
 // GlobOS is like Glob except that it operates on vos.
-func GlobOS(vos OS, pattern string) (matches []string, err error) {
+func GlobOS(vos OS, pattern string, followSymlinks bool) (matches []string, err error) {
 	if len(pattern) == 0 {
 		return nil, nil
 	}
@@ -305,7 +305,7 @@ func GlobOS(vos OS, pattern string) (matches []string, err error) {
 			return nil, ErrBadPattern
 		}
 		for _, o := range options {
-			m, e := GlobOS(vos, o+pattern[endOptions+1:])
+			m, e := GlobOS(vos, o+pattern[endOptions+1:], followSymlinks)
 			if e != nil {
 				return nil, e
 			}
@@ -323,15 +323,15 @@ func GlobOS(vos OS, pattern string) (matches []string, err error) {
 	isWindowsUNC := strings.HasPrefix(volumeName, `\\`)
 	if isWindowsUNC || isAbs {
 		startIdx := len(volumeName) + 1
-		return doGlob(vos, fmt.Sprintf("%s%s", volumeName, string(vos.PathSeparator())), filepath.ToSlash(pattern[startIdx:]), matches)
+		return doGlob(vos, fmt.Sprintf("%s%s", volumeName, string(vos.PathSeparator())), filepath.ToSlash(pattern[startIdx:]), matches, followSymlinks)
 	}
 
 	// otherwise, it's a relative pattern
-	return doGlob(vos, ".", filepath.ToSlash(pattern), matches)
+	return doGlob(vos, ".", filepath.ToSlash(pattern), matches, followSymlinks)
 }
 
 // Perform a glob
-func doGlob(vos OS, basedir, pattern string, matches []string) (m []string, e error) {
+func doGlob(vos OS, basedir, pattern string, matches []string, followSymlinks bool) (m []string, e error) {
 	m = matches
 	e = nil
 
@@ -392,7 +392,7 @@ func doGlob(vos OS, basedir, pattern string, matches []string) (m []string, e er
 		// if the current component is a doublestar, we'll try depth-first
 		for _, file := range files {
 			// if symlink, we may want to follow
-			if (file.Mode() & os.ModeSymlink) != 0 {
+			if followSymlinks && (file.Mode()&os.ModeSymlink) != 0 {
 				file, err = vos.Stat(filepath.Join(basedir, file.Name()))
 				if err != nil {
 					continue
@@ -404,7 +404,10 @@ func doGlob(vos OS, basedir, pattern string, matches []string) (m []string, e er
 				if lastComponent {
 					m = append(m, filepath.Join(basedir, file.Name()))
 				}
-				m, e = doGlob(vos, filepath.Join(basedir, file.Name()), pattern, m)
+				if !followSymlinks && (file.Mode()&os.ModeSymlink) != 0 {
+					continue
+				}
+				m, e = doGlob(vos, filepath.Join(basedir, file.Name()), pattern, m, followSymlinks)
 			} else if lastComponent {
 				// if the pattern's last component is a doublestar, we match filenames, too
 				m = append(m, filepath.Join(basedir, file.Name()))
@@ -429,7 +432,7 @@ func doGlob(vos OS, basedir, pattern string, matches []string) (m []string, e er
 				m = append(m, filepath.Join(basedir, file.Name()))
 			} else {
 				for _, alt := range match {
-					m, e = doGlob(vos, filepath.Join(basedir, file.Name()), alt, m)
+					m, e = doGlob(vos, filepath.Join(basedir, file.Name()), alt, m, followSymlinks)
 				}
 			}
 		}

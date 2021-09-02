@@ -30,3 +30,6 @@ _testmain.go
 
 # test directory
 test/
+
+# Goland
+.idea/
