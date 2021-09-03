@@ -15,6 +15,7 @@ workflows:
     - smoke_test
     - ignore_path_test
     - generic_fs_checks
+    - glob_checks
     - test-stack-version
     # - backward_compatibility_test
     steps:
@@ -135,7 +136,7 @@ workflows:
     - script:
         title: Download assets
         inputs:
-        - content:  git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
+        - content: git clone https://github.com/bitrise-samples/sample-artifacts.git $TMP_DIR/_sample_artifacts
     - change-workdir:
         title: Switch working dir to $TMP_DIR/_workdir
         run_if: true
@@ -219,7 +220,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove TMP_DIR to cleanup test_ignorechanges.txt file
             rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
@@ -257,7 +258,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove TMP_DIR to cleanup test_ignorechanges.txt file
             rm -rf $TMP_DIR
             # extract the archive to get the archived test_ignorechanges.txt file
@@ -345,7 +346,7 @@ workflows:
         - content: |-
             #!/bin/bash
             set -ex
-            
+
             # remove CACHE_PATH to cleanup
             rm -rf $CACHE_PATH
             mkdir $CACHE_PATH
@@ -404,6 +405,148 @@ workflows:
               exit 1
             fi
 
+  glob_relative_checks:
+      description: |
+          Tests if relative globbing works.
+      envs:
+      - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_relative_glob
+      steps:
+      - script:
+            title: Cleanup $TMP_DIR and archive tmp files
+            inputs:
+            - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+      - script:
+            title: Create sample files
+            is_always_run: true
+            inputs:
+            - content: |-
+                  #!/bin/bash
+                  set -ex
+
+                  mkdir $TMP_DIR
+                  mkdir $TMP_DIR/cache
+                  echo "content" > $TMP_DIR/cache/foo.txt
+                  mkdir $TMP_DIR/cache/1
+                  echo "content" > $TMP_DIR/cache/1/bar.txt
+                  echo "content" > $TMP_DIR/cache/1/baz.txt
+                  mkdir $TMP_DIR/cache/2
+                  echo "content" > $TMP_DIR/cache/2/qux.txt
+                  mkdir $TMP_DIR/cache/3
+      - change-workdir:
+            title: Switch working dir to $TMP_DIR/cache
+            inputs:
+            - path: $TMP_DIR/cache
+            - is_create_path: true
+      - path::./:
+            title: Step Test
+            is_always_run: true
+            run_if: true
+            is_skippable: false
+            inputs:
+            - compress_archive: true
+            - is_debug_mode: true
+            - cache_paths: ./**/*.txt
+      - script:
+            title: Check if stored structure exists
+            is_always_run: true
+            inputs:
+            - content: |-
+                  #!/bin/bash
+                  set -ex
+
+                  # remove CACHE_PATH to cleanup
+                  rm -rf $TMP_DIR/cache
+                  mkdir $TMP_DIR/cache
+                  cd $TMP_DIR/cache
+
+                  # extract the archive
+                  tar -xPf /tmp/cache-archive.tar
+
+                  if [ ! -f $TMP_DIR/cache/foo.txt ]; then
+                    echo "dir should exist"
+                    exit 1
+                  fi
+
+                  if [ ! -f $TMP_DIR/cache/1/bar.txt ]; then
+                    echo "dir should exist"
+                    exit 1
+                  fi
+
+                  if [ ! -f $TMP_DIR/cache/1/baz.txt ]; then
+                    echo "dir should exist"
+                    exit 1
+                  fi
+
+                  if [ ! -f $TMP_DIR/cache/2/qux.txt ]; then
+                    echo "dir should exist"
+                    exit 1
+                  fi
+
+  glob_checks:
+    description: |
+      Tests if glob matching works.
+    envs:
+    - CACHE_PATH: |
+        ~/.bitrise/**/*.yml -> ~/.bitrise/plugins/spec.yml
+        ./DoesNotExist/
+        ./DoesNotExist/ -> ./doesnotexist.yml
+        ./DoesNotExist
+        ~/DoesNotExist
+        ~/.bitrise/plugins/step/*/*.go
+    - TMP_DIR: $ORIG_BITRISE_SOURCE_DIR/_tmp_glob
+    steps:
+    - script:
+        title: Cleanup archive tmp files
+        inputs:
+        - content: rm -rf "$TMP_DIR" "/tmp/cache-archive.tar" "/tmp/cache-info.json"
+    - change-workdir:
+        title: Switch working dir to $TMP_DIR
+        inputs:
+        - path: $TMP_DIR
+        - is_create_path: true
+    - path::./:
+        title: Step Test
+        is_always_run: true
+        run_if: true
+        is_skippable: false
+        inputs:
+        - compress_archive: true
+        - is_debug_mode: true
+        - cache_paths: $CACHE_PATH
+    - script:
+        title: Check if stored structure exists
+        is_always_run: true
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+
+            cd $TMP_DIR
+
+            # extract the archive
+            tar -xf /tmp/cache-archive.tar
+
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/spec.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/analytics/src/bitrise.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/bitrise-plugin.yml ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ ! -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/main.go ]; then
+              echo "file should exist"
+              exit 1
+            fi
+            if [ -f $TMP_DIR/$HOME/.bitrise/plugins/step/src/cmd/version.go ]; then
+              echo "file should not exist"
+              exit 1
+            fi
+
   test-stack-version:
     description: |
       Test that archive_info.json containing stack ID is created.
@@ -453,23 +596,6 @@ workflows:
               echo "archive_info.json not found as first file in archive"
               exit 1
             fi
-
-  # ----------------------------------------------------------------
-  # --- Utility workflows
-  dep-update:
-    title: Dep update
-    description: |
-      Used for updating bitrise dependencies with dep
-    steps:
-    - script:
-        title: Dependency update
-        inputs:
-        - content: |-
-            #!/bin/bash
-            set -ex
-            go get -u -v github.com/golang/dep/cmd/dep
-            dep ensure -v
-            dep ensure -v -update
 
   # ----------------------------------------------------------------
   # --- workflows to Share this step into a Step Library

@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bitrise-io/doublestar/v3"
 	"github.com/bitrise-io/go-utils/log"
 	"github.com/bitrise-io/go-utils/pathutil"
 	"github.com/ryanuber/go-glob"
@@ -148,28 +149,30 @@ func normalizeIndicatorByPath(indicatorByPath map[string]string) (map[string]str
 			return nil, err
 		}
 
-		exist, err := pathutil.IsPathExists(pth)
+		matches, err := doublestar.Glob(pth, false)
 		if err != nil {
 			return nil, err
 		}
-		if !exist {
+		if len(matches) == 0 {
 			log.Warnf("path does not exists at: %s", pth)
 			continue
 		}
 
-		regularFiles, symlinkPaths, dirPaths, err := expandPath(pth)
-		if err != nil {
-			return nil, err
-		}
-		for _, dir := range dirPaths {
-			normalized[dir] = "-"
-		}
-		for _, file := range regularFiles {
-			normalized[file] = indicator
-		}
-		for _, file := range symlinkPaths {
-			// this file's changes does not fluctuates existing cache invalidation
-			normalized[file] = "-"
+		for _, p := range matches {
+			regularFiles, symlinkPaths, dirPaths, err := expandPath(p)
+			if err != nil {
+				return nil, err
+			}
+			for _, dir := range dirPaths {
+				normalized[dir] = "-"
+			}
+			for _, file := range regularFiles {
+				normalized[file] = indicator
+			}
+			for _, file := range symlinkPaths {
+				// this file's changes does not fluctuates existing cache invalidation
+				normalized[file] = "-"
+			}
 		}
 	}
 	return normalized, nil
