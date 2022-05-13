@@ -5,12 +5,16 @@ import (
 	"fmt"
 )
 
-func stackVersionData(stackID string) ([]byte, error) {
+func stackVersionData(stackID, architecture string) ([]byte, error) {
 	type archiveInfo struct {
-		StackID string `json:"stack_id,omitempty"`
+		Version     uint64 `json:"version,omitempty"`
+		StackID     string `json:"stack_id,omitempty"`
+		Arhitecture string `json:"architecture,omitempty"`
 	}
 	stackData, err := json.Marshal(archiveInfo{
-		StackID: stackID,
+		Version:     2,
+		StackID:     stackID,
+		Arhitecture: architecture,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal data, error: %s", err)
