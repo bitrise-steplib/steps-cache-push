@@ -32,6 +32,7 @@ func logErrorfAndExit(format string, args ...interface{}) {
 }
 
 func main() {
+	const architecture = runtime.GOARCH
 	stepStartedAt := time.Now()
 
 	configs, err := ParseConfig()
@@ -40,7 +41,6 @@ func main() {
 	}
 
 	configs.Print()
-	architecture := runtime.GOARCH
 	fmt.Printf("- architecture: %s", architecture)
 	fmt.Println()
 
