@@ -12,6 +12,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ func logErrorfAndExit(format string, args ...interface{}) {
 }
 
 func main() {
+	const architecture = runtime.GOARCH
 	stepStartedAt := time.Now()
 
 	configs, err := ParseConfig()
@@ -39,6 +41,7 @@ func main() {
 	}
 
 	configs.Print()
+	fmt.Printf("- architecture: %s", architecture)
 	fmt.Println()
 
 	log.SetEnableDebugLog(configs.DebugMode)
@@ -143,7 +146,7 @@ func main() {
 		logErrorfAndExit("Failed to create archive: %s", err)
 	}
 
-	stackData, err := stackVersionData(configs.StackID)
+	stackData, err := stackVersionData(configs.StackID, architecture)
 	if err != nil {
 		logErrorfAndExit("Failed to get stack version info: %s", err)
 	}
